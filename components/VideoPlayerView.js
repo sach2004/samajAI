@@ -45,11 +45,34 @@ export default function VideoPlayerView({ videoData }) {
           rel: 0,
         },
         events: {
-          onReady: onPlayerReady,
-          onStateChange: onPlayerStateChange,
+          onReady: (event) => {
+            console.log("YouTube player ready");
+            event.target.mute();
+            setPlayer(event.target);
+          },
+          onStateChange: (event) => {
+            console.log("Player state:", event.data);
+
+            if (event.data === 1) {
+              setIsPlaying(true);
+              setTimeout(() => {
+                if (
+                  audioBuffersRef.current.length > 0 &&
+                  audioContextRef.current
+                ) {
+                  playAudioTrack(event.target);
+                }
+              }, 200);
+            } else if (event.data === 2) {
+              setIsPlaying(false);
+              stopAllAudio();
+            } else if (event.data === 0) {
+              setIsPlaying(false);
+              stopAllAudio();
+            }
+          },
         },
       });
-      setPlayer(newPlayer);
     };
 
     audioContextRef.current = new (window.AudioContext ||
@@ -155,8 +178,10 @@ export default function VideoPlayerView({ videoData }) {
     }
   };
 
-  const playAudioTrack = async () => {
-    if (!audioContextRef.current || !player) {
+  const playAudioTrack = async (playerInstance) => {
+    const activePlayer = playerInstance || player;
+
+    if (!audioContextRef.current || !activePlayer) {
       console.error("Missing audio context or player");
       return;
     }
@@ -168,7 +193,7 @@ export default function VideoPlayerView({ videoData }) {
 
     stopAllAudio();
 
-    const currentVideoTime = player.getCurrentTime();
+    const currentVideoTime = activePlayer.getCurrentTime();
     const audioContext = audioContextRef.current;
 
     console.log("Starting audio from:", currentVideoTime);

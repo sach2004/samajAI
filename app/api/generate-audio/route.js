@@ -1,9 +1,30 @@
 import { NextResponse } from "next/server";
-import { LANGUAGE_CODES, VOICE_MAP } from "../../../lib/constants";
+
+const LANGUAGE_CODES = {
+  hi: "hi-IN",
+  ta: "ta-IN",
+  te: "te-IN",
+  kn: "kn-IN",
+  ml: "ml-IN",
+  bn: "bn-IN",
+  mr: "mr-IN",
+  gu: "gu-IN",
+};
+
+const VOICE_MAP = {
+  hi: { male: "hi-IN-Wavenet-B", female: "hi-IN-Wavenet-D" },
+  ta: { male: "ta-IN-Wavenet-B", female: "ta-IN-Wavenet-A" },
+  te: { male: "te-IN-Standard-B", female: "te-IN-Standard-A" },
+  bn: { male: "bn-IN-Wavenet-B", female: "bn-IN-Wavenet-A" },
+  kn: { male: "kn-IN-Wavenet-B", female: "kn-IN-Wavenet-A" },
+  ml: { male: "ml-IN-Wavenet-B", female: "ml-IN-Wavenet-A" },
+  gu: { male: "gu-IN-Wavenet-B", female: "gu-IN-Wavenet-A" },
+  mr: { male: "mr-IN-Wavenet-B", female: "mr-IN-Wavenet-A" },
+};
 
 export async function POST(request) {
   try {
-    const { transcript, language } = await request.json();
+    const { transcript, language, voiceGender } = await request.json();
 
     if (!transcript || !Array.isArray(transcript)) {
       return NextResponse.json(
@@ -12,8 +33,11 @@ export async function POST(request) {
       );
     }
 
-    const voiceName = VOICE_MAP[language] || "hi-IN-Wavenet-D";
+    const gender = voiceGender || "female";
+    const voiceName = VOICE_MAP[language]?.[gender] || "hi-IN-Wavenet-D";
     const languageCode = LANGUAGE_CODES[language] || "hi-IN";
+
+    console.log(`🎙️ Using ${gender} voice: ${voiceName}`);
 
     const audioSegments = await Promise.all(
       transcript.map(async (segment) => {
