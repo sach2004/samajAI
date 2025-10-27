@@ -36,19 +36,18 @@ export default function VideoPlayerView({ videoData }) {
   const [showQuiz, setShowQuiz] = useState(false);
   const [videoEnded, setVideoEnded] = useState(false);
   const [audioError, setAudioError] = useState("");
-  const [audioContextState, setAudioContextState] = useState("initializing");
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
 
   const audioContextRef = useRef(null);
   const audioSourceRef = useRef(null);
   const concatenatedBufferRef = useRef(null);
   const gainNodeRef = useRef(null);
+  const audioStartTimeRef = useRef(0); // When audio started in AudioContext time
+  const audioStartOffsetRef = useRef(0); // Where in the buffer we started
 
   useEffect(() => {
     console.log("🎬 VideoPlayerView mounted");
-    console.log("📦 Audio segments received:", videoData.audioSegments?.length);
 
-    // Load YouTube IFrame API
     const tag = document.createElement("script");
     tag.src = "https://www.youtube.com/iframe_api";
     const firstScriptTag = document.getElementsByTagName("script")[0];
@@ -70,23 +69,16 @@ export default function VideoPlayerView({ videoData }) {
       });
     };
 
-    // Initialize audio context
     try {
       audioContextRef.current = new (window.AudioContext ||
         window.webkitAudioContext)();
-      console.log("✅ Audio context created:", audioContextRef.current.state);
-      setAudioContextState(audioContextRef.current.state);
-
-      // Create gain node for volume control
       gainNodeRef.current = audioContextRef.current.createGain();
       gainNodeRef.current.gain.value = 1.0;
       gainNodeRef.current.connect(audioContextRef.current.destination);
-
-      // Preload and concatenate audio
       preloadAndConcatenateAudio();
     } catch (error) {
       console.error("❌ Failed to create audio context:", error);
-      setAudioError("Failed to initialize audio system: " + error.message);
+      setAudioError("Failed to initialize audio: " + error.message);
     }
 
     return () => {
@@ -101,23 +93,17 @@ export default function VideoPlayerView({ videoData }) {
   };
 
   const onPlayerStateChange = (event) => {
-    console.log("🎮 Player state changed:", event.data);
-
     if (event.data === 1) {
       // Playing
       setIsPlaying(true);
-
-      // Try to play audio, with retry if not ready
       const attemptAudioPlay = () => {
         if (concatenatedBufferRef.current) {
-          const currentVideoTime = event.target.getCurrentTime();
-          playAudioFromTime(currentVideoTime);
+          playAudioFromTime(0); // Always start from beginning
         } else {
-          console.warn("⚠️ Audio not ready yet, retrying in 500ms...");
+          console.warn("⚠️ Audio not ready, retrying...");
           setTimeout(attemptAudioPlay, 500);
         }
       };
-
       attemptAudioPlay();
     } else if (event.data === 2) {
       // Paused
@@ -132,298 +118,145 @@ export default function VideoPlayerView({ videoData }) {
   };
 
   const preloadAndConcatenateAudio = async () => {
-    console.log("🔄 Preloading and concatenating audio segments...");
+    console.log("🔄 Preloading audio...");
 
-    if (!audioContextRef.current) {
-      setAudioError("Audio context not initialized");
-      return;
-    }
+    if (!audioContextRef.current) return;
 
     const audioContext = audioContextRef.current;
     const segments = videoData.audioSegments;
 
-    if (!segments || segments.length === 0) {
-      setAudioError("No audio segments found");
-      return;
-    }
-
     try {
-      // Step 1: Decode all audio segments
       const audioSegments = [];
-      let failedSegments = 0;
 
       for (let i = 0; i < segments.length; i++) {
         const segment = segments[i];
-
-        if (!segment.audioBase64) {
-          console.warn(
-            `⚠️ Segment ${i} missing audio:`,
-            segment.text.substring(0, 30)
-          );
-          failedSegments++;
-          continue;
-        }
+        if (!segment.audioBase64) continue;
 
         try {
           const audioData = atob(segment.audioBase64);
           const arrayBuffer = new ArrayBuffer(audioData.length);
           const view = new Uint8Array(arrayBuffer);
-
           for (let j = 0; j < audioData.length; j++) {
             view[j] = audioData.charCodeAt(j);
           }
 
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
           audioSegments.push({
             buffer: audioBuffer,
-            originalStart: segment.start, // Keep for subtitle sync
-            originalDuration: segment.duration,
-            actualDuration: audioBuffer.duration, // Use REAL audio duration
+            originalStart: segment.start,
             text: segment.text,
           });
 
           if ((i + 1) % 10 === 0) {
-            console.log(`📥 Decoded ${i + 1}/${segments.length} segments`);
+            console.log(`📥 Decoded ${i + 1}/${segments.length}`);
           }
         } catch (error) {
-          console.error(`❌ Error decoding segment ${i}:`, error);
-          failedSegments++;
+          console.error(`❌ Segment ${i} failed:`, error);
         }
       }
 
-      console.log(
-        `✅ Decoded ${audioSegments.length} audio segments (${failedSegments} failed)`
-      );
-
-      if (audioSegments.length === 0) {
-        setAudioError("Failed to decode any audio segments");
-        return;
-      }
-
-      // Step 2: Calculate total duration based on ACTUAL audio lengths
-      // Place segments sequentially with small gaps
+      // Create ONE continuous buffer with small gaps
       let totalDuration = 0;
-      const gapBetweenSegments = 0.15; // 150ms natural pause between sentences
+      const gap = 0.1; // 100ms between segments
 
-      audioSegments.forEach((segment, index) => {
-        segment.newStart = totalDuration; // New sequential position
-        totalDuration += segment.actualDuration + gapBetweenSegments;
+      audioSegments.forEach((seg) => {
+        seg.newStart = totalDuration;
+        totalDuration += seg.buffer.duration + gap;
       });
-
-      console.log(`📊 Total audio duration: ${totalDuration.toFixed(2)}s`);
 
       const sampleRate = audioContext.sampleRate;
-      const numberOfChannels = audioSegments[0].buffer.numberOfChannels;
+      const channels = audioSegments[0].buffer.numberOfChannels;
       const totalSamples = Math.ceil(totalDuration * sampleRate);
 
-      console.log(`📊 Creating concatenated buffer:`, {
-        duration: totalDuration.toFixed(2) + "s",
-        sampleRate: sampleRate + "Hz",
-        channels: numberOfChannels,
-        samples: totalSamples,
-        segments: audioSegments.length,
-      });
-
-      // Step 3: Create buffer with total duration
       const concatenatedBuffer = audioContext.createBuffer(
-        numberOfChannels,
+        channels,
         totalSamples,
         sampleRate
       );
 
-      // Step 4: Copy each segment at its NEW sequential position
-      for (const segment of audioSegments) {
-        const startSample = Math.floor(segment.newStart * sampleRate);
+      // Copy audio data
+      for (const seg of audioSegments) {
+        const startSample = Math.floor(seg.newStart * sampleRate);
+        for (let ch = 0; ch < channels; ch++) {
+          const input = seg.buffer.getChannelData(ch);
+          const output = concatenatedBuffer.getChannelData(ch);
 
-        for (let channel = 0; channel < numberOfChannels; channel++) {
-          const inputData = segment.buffer.getChannelData(channel);
-          const outputData = concatenatedBuffer.getChannelData(channel);
-
-          // Apply crossfade for smooth transitions
-          const crossfadeSamples = Math.min(960, inputData.length / 10); // 20ms fade
-
-          for (let i = 0; i < inputData.length; i++) {
+          const fade = Math.min(480, input.length / 10);
+          for (let i = 0; i < input.length; i++) {
             if (startSample + i >= totalSamples) break;
-
-            let sample = inputData[i];
-
-            // Fade in at start
-            if (i < crossfadeSamples) {
-              sample *= i / crossfadeSamples;
-            }
-
-            // Fade out at end
-            if (i > inputData.length - crossfadeSamples) {
-              sample *= (inputData.length - i) / crossfadeSamples;
-            }
-
-            outputData[startSample + i] = sample;
+            let sample = input[i];
+            if (i < fade) sample *= i / fade;
+            if (i > input.length - fade) sample *= (input.length - i) / fade;
+            output[startSample + i] = sample;
           }
         }
       }
 
       concatenatedBufferRef.current = concatenatedBuffer;
 
-      // Store mapping for subtitle sync (original time → new audio time)
+      // Store mapping for subtitles
       window.audioSegmentMapping = audioSegments.map((seg) => ({
-        originalStart: seg.originalStart,
-        originalEnd: seg.originalStart + seg.originalDuration,
         newStart: seg.newStart,
-        newEnd: seg.newStart + seg.actualDuration,
+        newEnd: seg.newStart + seg.buffer.duration,
         text: seg.text,
       }));
 
-      console.log(`🎵 ✅ Audio buffer ready:`, {
-        duration: concatenatedBuffer.duration.toFixed(2) + "s",
-        channels: concatenatedBuffer.numberOfChannels,
-        sampleRate: concatenatedBuffer.sampleRate,
-        segments: audioSegments.length,
-      });
-
-      console.log(`📍 Sample mapping:`, window.audioSegmentMapping.slice(0, 3));
-
+      console.log(
+        `✅ Audio ready: ${totalDuration.toFixed(2)}s, ${
+          audioSegments.length
+        } segments`
+      );
       setAudioLoaded(true);
-      setAudioError("");
     } catch (error) {
-      console.error("❌ Fatal error in audio processing:", error);
+      console.error("❌ Audio processing failed:", error);
       setAudioError("Failed to process audio: " + error.message);
     }
   };
 
-  const ensureAudioContextRunning = async () => {
-    if (!audioContextRef.current) return false;
+  const playAudioFromTime = async (startOffset) => {
+    if (
+      !audioContextRef.current ||
+      !concatenatedBufferRef.current ||
+      !gainNodeRef.current
+    ) {
+      console.error("❌ Audio not ready");
+      return;
+    }
+
+    stopAudio();
 
     const audioContext = audioContextRef.current;
 
     if (audioContext.state === "suspended") {
-      console.log("🔓 Resuming suspended audio context...");
-      try {
-        await audioContext.resume();
-        console.log("✅ Audio context resumed, state:", audioContext.state);
-        setAudioContextState(audioContext.state);
-        return true;
-      } catch (error) {
-        console.error("❌ Failed to resume audio context:", error);
-        setAudioError("Failed to start audio: " + error.message);
-        return false;
-      }
+      await audioContext.resume();
     }
-
-    return true;
-  };
-
-  const playAudioFromTime = async (startTime) => {
-    console.log(
-      "🎵 playAudioFromTime called, video time:",
-      startTime.toFixed(2)
-    );
-
-    if (!audioContextRef.current) {
-      console.error("❌ No audio context");
-      setAudioError("Audio context not initialized");
-      return;
-    }
-
-    if (!concatenatedBufferRef.current) {
-      console.error("❌ No audio buffer");
-      setAudioError("Audio buffer not loaded");
-      return;
-    }
-
-    if (!gainNodeRef.current) {
-      console.error("❌ No gain node");
-      setAudioError("Audio output not configured");
-      return;
-    }
-
-    // Stop any existing audio
-    stopAudio();
-
-    // Ensure audio context is running
-    const isRunning = await ensureAudioContextRunning();
-    if (!isRunning) return;
-
-    const audioContext = audioContextRef.current;
 
     try {
-      // Create new source
       const source = audioContext.createBufferSource();
       source.buffer = concatenatedBufferRef.current;
-
-      // Connect source → gain → destination
       source.connect(gainNodeRef.current);
 
-      console.log("🔊 Audio chain connected: source → gain → destination");
+      const duration = concatenatedBufferRef.current.duration - startOffset;
+      if (duration <= 0) return;
 
-      // Find corresponding audio time based on video time using mapping
-      let audioOffset = 0;
-
-      if (window.audioSegmentMapping && startTime > 0) {
-        // Find which segment the video is at
-        const currentSegment = window.audioSegmentMapping.find(
-          (seg) => startTime >= seg.originalStart && startTime < seg.originalEnd
-        );
-
-        if (currentSegment) {
-          // Start from the beginning of this audio segment
-          audioOffset = currentSegment.newStart;
-          console.log(
-            `📍 Video at ${startTime.toFixed(
-              2
-            )}s → Audio segment starts at ${audioOffset.toFixed(2)}s`
-          );
-        } else {
-          // If between segments, find the next segment
-          const nextSegment = window.audioSegmentMapping.find(
-            (seg) => seg.originalStart > startTime
-          );
-          if (nextSegment) {
-            audioOffset = nextSegment.newStart;
-            console.log(
-              `📍 Video at ${startTime.toFixed(
-                2
-              )}s → Next audio segment at ${audioOffset.toFixed(2)}s`
-            );
-          }
-        }
-      }
-
-      // Calculate remaining duration
-      const duration = concatenatedBufferRef.current.duration - audioOffset;
-
-      if (duration <= 0) {
-        console.warn("⚠️ No audio left to play at this time");
-        return;
-      }
-
-      // Start playing
-      source.start(0, audioOffset, duration);
+      source.start(0, startOffset, duration);
       audioSourceRef.current = source;
+
+      // Track when audio started for subtitle sync
+      audioStartTimeRef.current = audioContext.currentTime;
+      audioStartOffsetRef.current = startOffset;
+
       setIsAudioPlaying(true);
 
-      console.log(
-        `▶️ 🔊 AUDIO PLAYING from ${audioOffset.toFixed(
-          2
-        )}s (${duration.toFixed(2)}s remaining)`
-      );
-      console.log(
-        "🔊 Buffer duration:",
-        concatenatedBufferRef.current.duration.toFixed(2) + "s"
-      );
-      console.log("🔊 Gain value:", gainNodeRef.current.gain.value);
-      console.log("🔊 Audio context state:", audioContext.state);
+      console.log(`▶️ Playing audio from ${startOffset.toFixed(2)}s`);
 
-      // Handle when audio ends naturally
       source.onended = () => {
-        console.log("🏁 Audio playback ended");
         audioSourceRef.current = null;
         setIsAudioPlaying(false);
       };
     } catch (error) {
-      console.error("❌ Error starting audio playback:", error);
-      setAudioError("Failed to play audio: " + error.message);
-      setIsAudioPlaying(false);
+      console.error("❌ Playback error:", error);
+      setAudioError("Playback failed: " + error.message);
     }
   };
 
@@ -432,7 +265,6 @@ export default function VideoPlayerView({ videoData }) {
       try {
         audioSourceRef.current.stop();
         audioSourceRef.current.disconnect();
-        console.log("⏹️ Audio stopped");
       } catch (e) {
         // Already stopped
       }
@@ -441,86 +273,31 @@ export default function VideoPlayerView({ videoData }) {
     }
   };
 
-  const testAudio = async () => {
-    console.log("🧪 Testing audio output...");
-
-    if (!audioContextRef.current) {
-      alert("Audio context not initialized!");
-      return;
-    }
-
-    await ensureAudioContextRunning();
-
-    const audioContext = audioContextRef.current;
-    const oscillator = audioContext.createOscillator();
-    const testGain = audioContext.createGain();
-
-    oscillator.connect(testGain);
-    testGain.connect(audioContext.destination);
-
-    oscillator.frequency.value = 440; // A4 note
-    testGain.gain.value = 0.3;
-
-    oscillator.start();
-
-    setTimeout(() => {
-      oscillator.stop();
-      console.log("✅ Test tone played");
-    }, 500);
-  };
-
-  // Update subtitles
+  // Update subtitles based on AUDIO position, not video position
   useEffect(() => {
-    if (!player || !isPlaying) return;
+    if (!isAudioPlaying || !audioContextRef.current) return;
 
     const interval = setInterval(() => {
-      if (player.getCurrentTime) {
-        const time = player.getCurrentTime();
-        updateSubtitle(time);
+      // Calculate current audio position
+      const elapsed =
+        audioContextRef.current.currentTime - audioStartTimeRef.current;
+      const currentAudioTime = audioStartOffsetRef.current + elapsed;
+
+      // Find matching subtitle
+      if (window.audioSegmentMapping) {
+        const segment = window.audioSegmentMapping.find(
+          (seg) =>
+            currentAudioTime >= seg.newStart && currentAudioTime < seg.newEnd
+        );
+        setCurrentSubtitle(segment ? segment.text : "");
       }
     }, 100);
 
     return () => clearInterval(interval);
-  }, [player, isPlaying]);
-
-  const updateSubtitle = (time) => {
-    // If we have audio playing, calculate the current audio position
-    let audioTime = 0;
-
-    if (audioSourceRef.current && audioContextRef.current) {
-      const timeSinceStart = audioContextRef.current.currentTime;
-      audioTime = time; // We'll sync based on when audio started
-    }
-
-    // Find which segment should be showing based on the audio mapping
-    if (window.audioSegmentMapping) {
-      const currentSegment = window.audioSegmentMapping.find((seg) => {
-        // Check if current video time falls in the ORIGINAL segment timing
-        return time >= seg.originalStart && time < seg.originalEnd;
-      });
-
-      if (currentSegment) {
-        setCurrentSubtitle(currentSegment.text);
-      } else {
-        setCurrentSubtitle("");
-      }
-    } else {
-      // Fallback to original method
-      const currentSegment = videoData.audioSegments.find(
-        (seg) => time >= seg.start && time < seg.start + seg.duration
-      );
-
-      if (currentSegment) {
-        setCurrentSubtitle(currentSegment.text);
-      } else {
-        setCurrentSubtitle("");
-      }
-    }
-  };
+  }, [isAudioPlaying]);
 
   const togglePlayPause = () => {
     if (!player) return;
-
     if (isPlaying) {
       player.pauseVideo();
     } else {
@@ -530,7 +307,6 @@ export default function VideoPlayerView({ videoData }) {
 
   const restartVideo = () => {
     if (!player) return;
-
     stopAudio();
     setVideoEnded(false);
     player.seekTo(0);
@@ -569,17 +345,7 @@ export default function VideoPlayerView({ videoData }) {
     <div className="max-w-5xl mx-auto">
       {audioError && (
         <Alert variant="destructive" className="mb-4">
-          <AlertDescription>
-            <strong>Audio Error:</strong> {audioError}
-            <Button
-              onClick={testAudio}
-              variant="outline"
-              size="sm"
-              className="ml-4"
-            >
-              Test Audio
-            </Button>
-          </AlertDescription>
+          <AlertDescription>{audioError}</AlertDescription>
         </Alert>
       )}
 
@@ -593,7 +359,6 @@ export default function VideoPlayerView({ videoData }) {
               <Badge variant="secondary">
                 {LANGUAGE_NAMES[videoData.language]}
               </Badge>
-              <Badge variant="secondary">{videoData.region}</Badge>
               <Badge
                 variant="secondary"
                 className={
@@ -612,7 +377,6 @@ export default function VideoPlayerView({ videoData }) {
                 )}
                 {isAudioPlaying ? "Playing" : "Silent"}
               </Badge>
-              <Badge variant="outline">Context: {audioContextState}</Badge>
             </div>
           </div>
 
@@ -681,10 +445,6 @@ export default function VideoPlayerView({ videoData }) {
               Restart
             </Button>
 
-            <Button onClick={testAudio} variant="outline" size="lg">
-              🔊 Test Audio
-            </Button>
-
             {videoEnded && (
               <Button
                 onClick={() => setShowQuiz(true)}
@@ -706,10 +466,9 @@ export default function VideoPlayerView({ videoData }) {
 
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-900">
-            <strong>🎙️ Audio Status:</strong>{" "}
-            {audioLoaded ? "Ready" : "Loading..."} • Context:{" "}
-            {audioContextState} •
-            {isAudioPlaying ? " 🔊 Audio Playing" : " 🔇 Audio Silent"}
+            <strong>🎙️ Smooth Audio:</strong> Natural{" "}
+            {LANGUAGE_NAMES[videoData.language]} narration with perfect subtitle
+            sync • {isAudioPlaying ? "🔊 Playing" : "🔇 Silent"}
           </p>
         </div>
       </Card>
