@@ -1,7 +1,7 @@
-import { LANGUAGE_NAMES } from "@/lib/constants";
-import { prisma } from "@/lib/prisma";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { prisma } from "../../../lib/prisma";
+import { LANGUAGE_NAMES } from "../../../lib/constants";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -9,10 +9,8 @@ export async function POST(request) {
   const startTime = Date.now();
 
   try {
-    const { videoId, transcript, targetLanguage, region } =
-      await request.json();
+    const { videoId, transcript, targetLanguage, region } = await request.json();
 
-    // Check cache
     const video = await prisma.video.findUnique({
       where: { videoId },
       include: {
@@ -26,12 +24,8 @@ export async function POST(request) {
     });
 
     if (video && video.transcripts.length > 0) {
-      const changes = await getChangesFromSession(
-        video.id,
-        targetLanguage,
-        region
-      );
-
+      const changes = await getChangesFromSession(video.id, targetLanguage, region);
+      
       return NextResponse.json({
         contextualizedTranscript: video.transcripts[0].segments,
         changes,
@@ -108,7 +102,6 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
 
     const changes = detectChanges(transcript, contextualizedTranscript);
 
-    // Save to database
     if (video) {
       await prisma.transcript.create({
         data: {
@@ -167,17 +160,15 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
   } catch (error) {
     console.error("Contextualization error:", error);
 
-    await prisma.analytics
-      .create({
-        data: {
-          eventType: "error",
-          metadata: {
-            error: error.message,
-            endpoint: "contextualize",
-          },
+    await prisma.analytics.create({
+      data: {
+        eventType: "error",
+        metadata: {
+          error: error.message,
+          endpoint: "contextualize",
         },
-      })
-      .catch(console.error);
+      },
+    }).catch(console.error);
 
     return NextResponse.json(
       { error: error.message || "Failed to contextualize content" },

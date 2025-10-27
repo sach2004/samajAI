@@ -1,5 +1,5 @@
-import { LANGUAGE_CODES, VOICE_MAP } from "@/lib/constants";
 import { NextResponse } from "next/server";
+import { LANGUAGE_CODES, VOICE_MAP } from "../../../lib/constants";
 
 export async function POST(request) {
   try {
@@ -15,7 +15,6 @@ export async function POST(request) {
     const voiceName = VOICE_MAP[language] || "hi-IN-Wavenet-D";
     const languageCode = LANGUAGE_CODES[language] || "hi-IN";
 
-    // Generate audio for each segment
     const audioSegments = await Promise.all(
       transcript.map(async (segment) => {
         try {

@@ -1,12 +1,15 @@
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { YoutubeTranscript } from "youtube-transcript";
+import { prisma } from "../../../lib/prisma";
 
 export async function POST(request) {
   try {
     const { videoUrl } = await request.json();
+    
+    console.log("Received video URL:", videoUrl);
 
     const videoId = extractVideoId(videoUrl);
+    
+    console.log("Extracted video ID:", videoId);
 
     if (!videoId) {
       return NextResponse.json(
@@ -15,6 +18,7 @@ export async function POST(request) {
       );
     }
 
+    // Check database cache
     const existingVideo = await prisma.video.findUnique({
       where: { videoId },
       include: {
@@ -25,6 +29,7 @@ export async function POST(request) {
     });
 
     if (existingVideo && existingVideo.transcripts.length > 0) {
+      console.log("Found cached transcript");
       return NextResponse.json({
         videoId,
         transcript: existingVideo.transcripts[0].segments,
@@ -32,21 +37,68 @@ export async function POST(request) {
       });
     }
 
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    // Fetch captions using YouTube Data API v3
+    const apiKey = process.env.YOUTUBE_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error("YouTube API key not configured");
+    }
 
-    if (!transcript || transcript.length === 0) {
+    // Get caption track ID
+    const captionsListUrl = `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${apiKey}`;
+    
+    const captionsListResponse = await fetch(captionsListUrl);
+    
+    if (!captionsListResponse.ok) {
+      throw new Error("Failed to fetch captions list from YouTube");
+    }
+
+    const captionsData = await captionsListResponse.json();
+    
+    console.log("Captions data:", captionsData);
+
+    if (!captionsData.items || captionsData.items.length === 0) {
       return NextResponse.json(
-        { error: "No transcript available for this video" },
+        { error: "No captions available for this video. Please choose a video with English captions." },
         { status: 404 }
       );
     }
 
-    const formattedTranscript = transcript.map((segment) => ({
-      text: segment.text,
-      start: segment.offset / 1000,
-      duration: segment.duration / 1000,
-    }));
+    // Find English caption track
+    const englishCaption = captionsData.items.find(
+      item => item.snippet.language === 'en' || 
+              item.snippet.language === 'en-US' ||
+              item.snippet.language === 'en-GB'
+    ) || captionsData.items[0];
 
+    console.log("Using caption track:", englishCaption.id);
+
+    // Download caption using timedtext API
+    const captionUrl = `https://www.youtube.com/api/timedtext?lang=${englishCaption.snippet.language}&v=${videoId}`;
+    
+    const captionResponse = await fetch(captionUrl);
+    
+    if (!captionResponse.ok) {
+      throw new Error("Failed to download captions");
+    }
+
+    const captionXML = await captionResponse.text();
+    
+    console.log("Caption XML fetched, length:", captionXML.length);
+
+    // Parse XML to extract transcript
+    const transcript = parseYouTubeCaptions(captionXML);
+
+    console.log("Parsed transcript:", transcript.length, "segments");
+
+    if (!transcript || transcript.length === 0) {
+      return NextResponse.json(
+        { error: "Failed to parse captions" },
+        { status: 404 }
+      );
+    }
+
+    // Save to database
     const video = await prisma.video.upsert({
       where: { videoId },
       update: { updatedAt: new Date() },
@@ -63,7 +115,7 @@ export async function POST(request) {
         videoId: video.id,
         type: "original",
         language: "en",
-        segments: formattedTranscript,
+        segments: transcript,
       },
     });
 
@@ -72,30 +124,28 @@ export async function POST(request) {
         eventType: "transcript_extracted",
         videoId: video.id,
         metadata: {
-          segmentCount: formattedTranscript.length,
+          segmentCount: transcript.length,
         },
       },
     });
 
     return NextResponse.json({
       videoId,
-      transcript: formattedTranscript,
+      transcript,
       cached: false,
     });
   } catch (error) {
     console.error("Transcript extraction error:", error);
 
-    await prisma.analytics
-      .create({
-        data: {
-          eventType: "error",
-          metadata: {
-            error: error.message,
-            endpoint: "extract-transcript",
-          },
+    await prisma.analytics.create({
+      data: {
+        eventType: "error",
+        metadata: {
+          error: error.message,
+          endpoint: "extract-transcript",
         },
-      })
-      .catch(console.error);
+      },
+    }).catch(console.error);
 
     return NextResponse.json(
       { error: error.message || "Failed to extract transcript" },
@@ -116,4 +166,35 @@ function extractVideoId(url) {
   }
 
   return null;
+}
+
+function parseYouTubeCaptions(xml) {
+  const transcript = [];
+  
+  // Parse XML manually (simple regex approach)
+  const textMatches = xml.matchAll(/<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]+)<\/text>/g);
+  
+  for (const match of textMatches) {
+    const start = parseFloat(match[1]);
+    const duration = parseFloat(match[2]);
+    let text = match[3];
+    
+    // Decode HTML entities
+    text = text
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<[^>]+>/g, ''); // Remove any HTML tags
+    
+    transcript.push({
+      text: text.trim(),
+      start,
+      duration,
+    });
+  }
+  
+  return transcript;
 }
