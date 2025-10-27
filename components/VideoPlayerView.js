@@ -337,6 +337,7 @@ export default function VideoPlayerView({ videoData }) {
       "0"
     )}:${String(secs).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
   };
+
   return (
     <div className="max-w-5xl mx-auto">
       {audioError && (
@@ -451,6 +452,19 @@ export default function VideoPlayerView({ videoData }) {
               🎤 Talk to Teacher
             </Button>
 
+            <Button
+              onClick={() => {
+                setShowChatbot(true);
+                setChatbotMinimized(false);
+              }}
+              variant="secondary"
+              size="lg"
+              className="bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600"
+            >
+              <MessageCircle className="w-5 h-5 mr-2" />
+              💬 Ask Questions
+            </Button>
+
             {videoEnded && (
               <Button
                 onClick={() => setShowQuiz(true)}
@@ -474,32 +488,20 @@ export default function VideoPlayerView({ videoData }) {
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <p className="text-sm font-bold text-foreground mb-2">
-                <strong>🎙️ New!</strong> Voice & Chat Features:
+                <strong>✨ Interactive Features:</strong>
               </p>
               <ul className="text-xs text-muted-foreground space-y-1 font-bold">
                 <li>
-                  • 🎤 Talk to AI teacher in{" "}
+                  • 🎤 Talk to AI teacher with voice in{" "}
                   {LANGUAGE_NAMES[videoData.language]}
                 </li>
-                <li>• 💬 Type questions and get instant answers</li>
+                <li>• 💬 Type questions and get instant text answers</li>
                 <li>
                   • 🔊 {isAudioPlaying ? "Playing" : "Silent"} - Natural voice
                   narration
                 </li>
               </ul>
             </div>
-            <Button
-              onClick={() => {
-                setShowChatbot(true);
-                setChatbotMinimized(false);
-              }}
-              variant="default"
-              size="sm"
-              className="shrink-0"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Open Chat
-            </Button>
           </div>
         </div>
       </Card>

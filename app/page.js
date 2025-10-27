@@ -52,10 +52,8 @@ export default function Home() {
 
       {step === "input" && (
         <div className="container mx-auto px-6 py-12 max-w-4xl text-center relative">
-          {/* 👇 MODIFIED SECTION: Two large, positioned Sparkles for the headline */}
           <Sparkles className="w-16 h-16 text-[#f582ae] animate-float absolute top-1/4 left-0 transform -translate-x-1/2 -translate-y-1/2" />
           <Sparkles className="w-16 h-16 text-[#8bd3dd] animate-float-slow absolute bottom-1/4 right-0 transform translate-x-1/2 translate-y-1/2" />
-          {/* 👆 END MODIFIED SECTION */}
 
           <h2 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
             Transform Educational Content
@@ -71,11 +69,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODIFIED CONTENT SECTION - ALL OTHER SPARKLES REMOVED */}
       <div className="container mx-auto px-6 py-8 flex justify-center relative">
-        {/* All other decorative Sparkles that were surrounding the form have been removed */}
-
-        <div className="w-full mb-8 max-w-2xl relative">
+        {/* Changed from max-w-2xl to max-w-6xl for much wider content area */}
+        <div
+          className={`w-full ${
+            step === "input" ? "max-w-2xl" : "max-w-6xl"
+          } relative`}
+        >
           {step === "input" && (
             <div
               className="absolute left-1/2 transform -translate-x-1/2 z-10"
@@ -148,7 +148,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-      {/* END OF MODIFIED CONTENT SECTION */}
 
       <footer className="border-t-4 border-black mt-16 py-6 bg-white">
         <div className="container mx-auto px-6 text-center">

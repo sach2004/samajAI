@@ -79,8 +79,11 @@ export default function VoiceTeacher({ videoData, onClose }) {
       console.error("Audio context error:", e);
     }
 
-    // Welcome message
-    addMessage("teacher", getWelcomeMessage(videoData.language));
+    // Welcome message - ONLY ADD ONCE
+    const welcomeMsg = getWelcomeMessage(videoData.language);
+    setConversation([
+      { role: "teacher", content: welcomeMsg, timestamp: Date.now() },
+    ]);
 
     return () => {
       if (recognitionRef.current) {
