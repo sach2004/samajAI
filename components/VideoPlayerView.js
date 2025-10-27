@@ -203,28 +203,46 @@ export default function VideoPlayerView({ videoData }) {
     }
 
     let scheduledCount = 0;
+    let lastEndTime = 0;
 
     for (const audioData of audioBuffersRef.current) {
-      const startTime = audioData.start - currentVideoTime;
+      const segmentStartTime = audioData.start - currentVideoTime;
 
-      if (startTime >= -0.2) {
+      // Only play segments that haven't passed
+      if (segmentStartTime >= -0.3) {
         try {
           const source = audioContext.createBufferSource();
           source.buffer = audioData.buffer;
           source.connect(audioContext.destination);
 
-          const playTime = audioContext.currentTime + Math.max(0, startTime);
-          source.start(playTime);
+          // Calculate when to start this audio
+          const scheduledTime =
+            audioContext.currentTime + Math.max(0, segmentStartTime);
+
+          // Ensure no overlap - start after previous audio ends
+          const actualStartTime = Math.max(scheduledTime, lastEndTime);
+
+          source.start(actualStartTime);
+
+          // Track when this audio will end
+          lastEndTime = actualStartTime + audioData.buffer.duration;
 
           audioSourcesRef.current.push(source);
           scheduledCount++;
+
+          console.log(
+            `Scheduled: "${audioData.text.substring(
+              0,
+              20
+            )}" at ${actualStartTime.toFixed(2)}s`
+          );
         } catch (error) {
           console.error("Error scheduling audio:", error);
         }
       }
     }
 
-    console.log(`Scheduled ${scheduledCount} audio segments`);
+    console.log(`Scheduled ${scheduledCount} audio segments without overlap`);
   };
 
   const stopAllAudio = () => {
