@@ -11,26 +11,32 @@ export async function POST(request) {
   try {
     const { videoId, transcript, targetLanguage, region } = await request.json();
 
-    const video = await prisma.video.findUnique({
-      where: { videoId },
-      include: {
-        transcripts: {
-          where: {
-            type: "contextualized",
-            language: targetLanguage,
+    // Check cache first
+    try {
+      const video = await prisma.video.findUnique({
+        where: { videoId },
+        include: {
+          transcripts: {
+            where: {
+              type: "contextualized",
+              language: targetLanguage,
+            },
           },
         },
-      },
-    });
-
-    if (video && video.transcripts.length > 0) {
-      const changes = await getChangesFromSession(video.id, targetLanguage, region);
-      
-      return NextResponse.json({
-        contextualizedTranscript: video.transcripts[0].segments,
-        changes,
-        cached: true,
       });
+
+      if (video && video.transcripts.length > 0) {
+        console.log("✅ Using cached contextualized transcript");
+        const changes = await getChangesFromSession(video.id, targetLanguage, region);
+        
+        return NextResponse.json({
+          contextualizedTranscript: video.transcripts[0].segments,
+          changes,
+          cached: true,
+        });
+      }
+    } catch (cacheError) {
+      console.log("⚠️ Cache check failed, proceeding with AI:", cacheError.message);
     }
 
     const languageName = LANGUAGE_NAMES[targetLanguage] || "Hindi";
@@ -68,8 +74,10 @@ OUTPUT FORMAT: Return ONLY a valid JSON array. No markdown, no code blocks, no e
 
 CRITICAL: Start your response with [ and end with ]. No other text.`;
 
+    console.log("🤖 Calling Gemini AI for contextualization...");
+
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
+      model: "gemini-2.0-flash-exp",
       generationConfig: {
         temperature: 0.7,
         topK: 40,
@@ -82,6 +90,8 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
     const response = await result.response;
     const responseText = response.text();
 
+    console.log("📝 Received Gemini response");
+
     let contextualizedTranscript;
     try {
       const jsonText = responseText
@@ -91,65 +101,79 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
 
       contextualizedTranscript = JSON.parse(jsonText);
     } catch (parseError) {
-      console.error("JSON parse error:", parseError);
-      console.error("Response text:", responseText);
-      throw new Error("Failed to parse response. Please try again.");
+      console.error("❌ JSON parse error:", parseError);
+      console.error("Response text:", responseText.substring(0, 500));
+      throw new Error("Failed to parse AI response. Please try again.");
     }
 
     if (!Array.isArray(contextualizedTranscript)) {
-      throw new Error("Invalid response format");
+      throw new Error("Invalid response format from AI");
     }
+
+    console.log("✅ Contextualization complete:", contextualizedTranscript.length, "segments");
 
     const changes = detectChanges(transcript, contextualizedTranscript);
 
-    if (video) {
-      await prisma.transcript.create({
-        data: {
-          videoId: video.id,
-          type: "contextualized",
-          language: targetLanguage,
-          segments: contextualizedTranscript,
-        },
+    // Save to database
+    try {
+      const video = await prisma.video.findUnique({
+        where: { videoId },
       });
 
-      await prisma.video.update({
-        where: { id: video.id },
-        data: {
-          targetLanguage,
-          region,
-          status: "completed",
-        },
-      });
-
-      const processingTime = Date.now() - startTime;
-      await prisma.processingSession.create({
-        data: {
-          videoId: video.id,
-          targetLanguage,
-          region,
-          currencyConversions: changes.currencyConversions,
-          locationChanges: changes.locationChanges,
-          measurementConversions: changes.measurementConversions,
-          culturalAdaptations: changes.culturalAdaptations,
-          processingTimeMs: processingTime,
-          transcriptLength: transcript.length,
-          status: "completed",
-          completedAt: new Date(),
-        },
-      });
-
-      await prisma.analytics.create({
-        data: {
-          eventType: "video_processed",
-          videoId: video.id,
-          language: targetLanguage,
-          region,
-          metadata: {
-            processingTimeMs: processingTime,
-            changes,
+      if (video) {
+        await prisma.transcript.create({
+          data: {
+            videoId: video.id,
+            type: "contextualized",
+            language: targetLanguage,
+            segments: contextualizedTranscript,
           },
-        },
-      });
+        });
+
+        await prisma.video.update({
+          where: { id: video.id },
+          data: {
+            targetLanguage,
+            region,
+            status: "completed",
+          },
+        });
+
+        const processingTime = Date.now() - startTime;
+        await prisma.processingSession.create({
+          data: {
+            videoId: video.id,
+            targetLanguage,
+            region,
+            currencyConversions: changes.currencyConversions,
+            locationChanges: changes.locationChanges,
+            measurementConversions: changes.measurementConversions,
+            culturalAdaptations: changes.culturalAdaptations,
+            processingTimeMs: processingTime,
+            transcriptLength: transcript.length,
+            status: "completed",
+            completedAt: new Date(),
+          },
+        });
+
+        await prisma.analytics.create({
+          data: {
+            eventType: "video_processed",
+            videoId: video.id,
+            language: targetLanguage,
+            region,
+            metadata: {
+              processingTimeMs: processingTime,
+              changes,
+            },
+          },
+        });
+
+        console.log("💾 Saved contextualized transcript to database");
+      }
+    } catch (dbError) {
+      console.error("⚠️ Database save failed:", dbError.message);
+      // Continue anyway, transcript is ready
     }
 
     return NextResponse.json({
@@ -158,17 +182,21 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
       cached: false,
     });
   } catch (error) {
-    console.error("Contextualization error:", error);
+    console.error("💥 Contextualization error:", error);
 
-    await prisma.analytics.create({
-      data: {
-        eventType: "error",
-        metadata: {
-          error: error.message,
-          endpoint: "contextualize",
+    try {
+      await prisma.analytics.create({
+        data: {
+          eventType: "error",
+          metadata: {
+            error: error.message,
+            endpoint: "contextualize",
+          },
         },
-      },
-    }).catch(console.error);
+      });
+    } catch (e) {
+      // Ignore
+    }
 
     return NextResponse.json(
       { error: error.message || "Failed to contextualize content" },
@@ -178,25 +206,29 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
 }
 
 async function getChangesFromSession(videoId, language, region) {
-  const session = await prisma.processingSession.findFirst({
-    where: {
-      videoId,
-      targetLanguage: language,
-      region,
-      status: "completed",
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  try {
+    const session = await prisma.processingSession.findFirst({
+      where: {
+        videoId,
+        targetLanguage: language,
+        region,
+        status: "completed",
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
-  if (session) {
-    return {
-      languageChange: `English → ${language}`,
-      currencyConversions: session.currencyConversions,
-      locationChanges: session.locationChanges,
-      measurementConversions: session.measurementConversions,
-      culturalAdaptations: session.culturalAdaptations,
-      examples: [],
-    };
+    if (session) {
+      return {
+        languageChange: `English → ${language}`,
+        currencyConversions: session.currencyConversions,
+        locationChanges: session.locationChanges,
+        measurementConversions: session.measurementConversions,
+        culturalAdaptations: session.culturalAdaptations,
+        examples: [],
+      };
+    }
+  } catch (error) {
+    console.error("Error fetching session:", error.message);
   }
 
   return {
