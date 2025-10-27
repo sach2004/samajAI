@@ -26,7 +26,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background relative overflow-hidden">
       <header className="border-b-4 border-black sticky top-0 z-50 bg-white">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -51,10 +51,11 @@ export default function Home() {
       </header>
 
       {step === "input" && (
-        <div className="container mx-auto px-6 py-12 max-w-4xl text-center">
-          <div className="flex justify-center mb-6">
-            <Sparkles className="w-12 h-12 text-[#f582ae] animate-float" />
-          </div>
+        <div className="container mx-auto px-6 py-12 max-w-4xl text-center relative">
+          {/* 👇 MODIFIED SECTION: Two large, positioned Sparkles for the headline */}
+          <Sparkles className="w-16 h-16 text-[#f582ae] animate-float absolute top-1/4 left-0 transform -translate-x-1/2 -translate-y-1/2" />
+          <Sparkles className="w-16 h-16 text-[#8bd3dd] animate-float-slow absolute bottom-1/4 right-0 transform translate-x-1/2 translate-y-1/2" />
+          {/* 👆 END MODIFIED SECTION */}
 
           <h2 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
             Transform Educational Content
@@ -70,15 +71,14 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODIFIED CONTENT SECTION */}
-      <div className="container mx-auto px-6 py-8 flex justify-center">
+      {/* MODIFIED CONTENT SECTION - ALL OTHER SPARKLES REMOVED */}
+      <div className="container mx-auto px-6 py-8 flex justify-center relative">
+        {/* All other decorative Sparkles that were surrounding the form have been removed */}
+
         <div className="w-full mb-8 max-w-2xl relative">
-          {/* 👇 MODIFIED PILL POSITIONING: Added mt-[-55px] and mb-[-35px] for the gap */}
           {step === "input" && (
             <div
               className="absolute left-1/2 transform -translate-x-1/2 z-10"
-              // Increase negative margin to pull up more, then add negative bottom margin
-              // We'll rely on the 'mt-8' on the form content below to manage the final gap.
               style={{ marginTop: "-65px", marginBottom: "-35px" }}
             >
               <div className="flex gap-2 p-2 rounded-full border-3 border-black shadow-cartoon-sm bg-white">
@@ -108,7 +108,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* 👇 MODIFIED FORM CONTENT: Reduced mt-8 to mt-4 to compensate for selector height */}
           <div className="mt-4">
             {tab === "video" && (
               <>
