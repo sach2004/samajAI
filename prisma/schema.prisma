@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Video {
+  id                     String   @id @default(cuid())
+  videoId                String   @unique
+  originalTitle          String?
+  thumbnailUrl           String?
+  duration               Int?
+  
+  targetLanguage         String
+  region                 String
+  status                 String   @default("processing")
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  transcripts            Transcript[]
+  processingSessions     ProcessingSession[]
+  
+  @@index([videoId])
+  @@index([createdAt])
+}
+
+model Transcript {
+  id                     String   @id @default(cuid())
+  videoId                String
+  video                  Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  
+  type                   String
+  language               String
+  
+  segments               Json
+  
+  createdAt              DateTime @default(now())
+  
+  @@index([videoId, type])
+}
+
+model ProcessingSession {
+  id                     String   @id @default(cuid())
+  videoId                String
+  video                  Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  
+  sessionId              String?
+  ipAddress              String?
+  
+  targetLanguage         String
+  region                 String
+  
+  currencyConversions    Int      @default(0)
+  locationChanges        Int      @default(0)
+  measurementConversions Int      @default(0)
+  culturalAdaptations    Int      @default(0)
+  
+  processingTimeMs       Int?
+  transcriptLength       Int?
+  
+  status                 String   @default("started")
+  errorMessage           String?
+  
+  createdAt              DateTime @default(now())
+  completedAt            DateTime?
+  
+  @@index([videoId])
+  @@index([createdAt])
+}
+
+model Analytics {
+  id                     String   @id @default(cuid())
+  
+  eventType              String
+  videoId                String?
+  
+  language               String?
+  region                 String?
+  
+  metadata               Json?
+  
+  createdAt              DateTime @default(now())
+  
+  @@index([eventType])
+  @@index([createdAt])
+}
