@@ -1,10 +1,10 @@
 "use client";
 
+import { Download, Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
-import { Download, Pause, Play, RotateCcw } from "lucide-react";
 
 const LANGUAGE_NAMES = {
   hi: "Hindi",
@@ -22,10 +22,14 @@ export default function VideoPlayerView({ videoData }) {
   const [player, setPlayer] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSubtitle, setCurrentSubtitle] = useState("");
+  const [audioLoaded, setAudioLoaded] = useState(false);
   const audioContextRef = useRef(null);
   const audioSourcesRef = useRef([]);
+  const audioBuffersRef = useRef([]);
 
   useEffect(() => {
+    console.log("VideoPlayerView mounted", videoData.audioSegments?.length);
+
     const tag = document.createElement("script");
     tag.src = "https://www.youtube.com/iframe_api";
     const firstScriptTag = document.getElementsByTagName("script")[0];
@@ -35,8 +39,8 @@ export default function VideoPlayerView({ videoData }) {
       const newPlayer = new window.YT.Player(playerRef.current, {
         videoId: videoData.videoId,
         playerVars: {
-          controls: 0,
-          disablekb: 1,
+          controls: 1,
+          disablekb: 0,
           modestbranding: 1,
           rel: 0,
         },
@@ -48,25 +52,79 @@ export default function VideoPlayerView({ videoData }) {
       setPlayer(newPlayer);
     };
 
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    audioContextRef.current = new (window.AudioContext ||
+      window.webkitAudioContext)();
+    preloadAudio();
 
     return () => {
       stopAllAudio();
     };
   }, []);
 
+  const preloadAudio = async () => {
+    console.log("Preloading audio segments...");
+
+    if (!audioContextRef.current) return;
+
+    const audioContext = audioContextRef.current;
+    let loadedCount = 0;
+
+    for (const segment of videoData.audioSegments) {
+      if (!segment.audioBase64) {
+        console.warn(
+          "Missing audio for segment:",
+          segment.text.substring(0, 30)
+        );
+        continue;
+      }
+
+      try {
+        const audioData = atob(segment.audioBase64);
+        const arrayBuffer = new ArrayBuffer(audioData.length);
+        const view = new Uint8Array(arrayBuffer);
+
+        for (let i = 0; i < audioData.length; i++) {
+          view[i] = audioData.charCodeAt(i);
+        }
+
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+        audioBuffersRef.current.push({
+          buffer: audioBuffer,
+          start: segment.start,
+          duration: segment.duration,
+          text: segment.text,
+        });
+
+        loadedCount++;
+      } catch (error) {
+        console.error("Error decoding audio:", error);
+      }
+    }
+
+    console.log(`Loaded ${loadedCount} audio segments`);
+    setAudioLoaded(true);
+  };
+
   const onPlayerReady = (event) => {
+    console.log("YouTube player ready");
     event.target.mute();
+    setPlayer(event.target);
   };
 
   const onPlayerStateChange = (event) => {
-    if (event.data === window.YT.PlayerState.PLAYING) {
+    console.log("Player state:", event.data);
+
+    if (event.data === 1) {
+      // Playing
       setIsPlaying(true);
-      playAudioTrack();
-    } else if (event.data === window.YT.PlayerState.PAUSED) {
+      setTimeout(() => playAudioTrack(), 100);
+    } else if (event.data === 2) {
+      // Paused
       setIsPlaying(false);
       stopAllAudio();
-    } else if (event.data === window.YT.PlayerState.ENDED) {
+    } else if (event.data === 0) {
+      // Ended
       setIsPlaying(false);
       stopAllAudio();
     }
@@ -89,7 +147,7 @@ export default function VideoPlayerView({ videoData }) {
     const currentSegment = videoData.audioSegments.find(
       (seg) => time >= seg.start && time < seg.start + seg.duration
     );
-    
+
     if (currentSegment) {
       setCurrentSubtitle(currentSegment.text);
     } else {
@@ -98,48 +156,54 @@ export default function VideoPlayerView({ videoData }) {
   };
 
   const playAudioTrack = async () => {
-    if (!audioContextRef.current || !player) return;
+    if (!audioContextRef.current || !player) {
+      console.error("Missing audio context or player");
+      return;
+    }
+
+    if (audioBuffersRef.current.length === 0) {
+      console.error("No audio buffers loaded");
+      return;
+    }
 
     stopAllAudio();
 
     const currentVideoTime = player.getCurrentTime();
     const audioContext = audioContextRef.current;
 
+    console.log("Starting audio from:", currentVideoTime);
+
     if (audioContext.state === "suspended") {
       await audioContext.resume();
     }
 
-    for (const segment of videoData.audioSegments) {
-      const startTime = segment.start - currentVideoTime;
-      
-      if (startTime >= -0.1 && segment.audioBase64) {
+    let scheduledCount = 0;
+
+    for (const audioData of audioBuffersRef.current) {
+      const startTime = audioData.start - currentVideoTime;
+
+      if (startTime >= -0.2) {
         try {
-          const audioData = atob(segment.audioBase64);
-          const arrayBuffer = new ArrayBuffer(audioData.length);
-          const view = new Uint8Array(arrayBuffer);
-          for (let i = 0; i < audioData.length; i++) {
-            view[i] = audioData.charCodeAt(i);
-          }
-
-          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
           const source = audioContext.createBufferSource();
-          source.buffer = audioBuffer;
+          source.buffer = audioData.buffer;
           source.connect(audioContext.destination);
 
           const playTime = audioContext.currentTime + Math.max(0, startTime);
           source.start(playTime);
 
           audioSourcesRef.current.push(source);
+          scheduledCount++;
         } catch (error) {
-          console.error("Error playing audio segment:", error);
+          console.error("Error scheduling audio:", error);
         }
       }
     }
+
+    console.log(`Scheduled ${scheduledCount} audio segments`);
   };
 
   const stopAllAudio = () => {
-    audioSourcesRef.current.forEach(source => {
+    audioSourcesRef.current.forEach((source) => {
       try {
         source.stop();
       } catch (e) {
@@ -161,18 +225,20 @@ export default function VideoPlayerView({ videoData }) {
 
   const restartVideo = () => {
     if (!player) return;
-    
+
     stopAllAudio();
     player.seekTo(0);
     player.playVideo();
   };
 
   const downloadSubtitles = () => {
-    const srtContent = videoData.audioSegments.map((seg, index) => {
-      const startTime = formatSRTTime(seg.start);
-      const endTime = formatSRTTime(seg.start + seg.duration);
-      return `${index + 1}\n${startTime} --> ${endTime}\n${seg.text}\n`;
-    }).join("\n");
+    const srtContent = videoData.audioSegments
+      .map((seg, index) => {
+        const startTime = formatSRTTime(seg.start);
+        const endTime = formatSRTTime(seg.start + seg.duration);
+        return `${index + 1}\n${startTime} --> ${endTime}\n${seg.text}\n`;
+      })
+      .join("\n");
 
     const blob = new Blob([srtContent], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -187,7 +253,10 @@ export default function VideoPlayerView({ videoData }) {
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 1000);
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(secs).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
   };
 
   return (
@@ -203,12 +272,15 @@ export default function VideoPlayerView({ videoData }) {
                 {LANGUAGE_NAMES[videoData.language]}
               </Badge>
               <Badge variant="secondary">{videoData.region}</Badge>
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                WaveNet Voice
+              <Badge
+                variant="secondary"
+                className="bg-green-100 text-green-800"
+              >
+                {audioLoaded ? "Audio Ready" : "Loading Audio..."}
               </Badge>
             </div>
           </div>
-          
+
           <div className="flex gap-4 text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
@@ -245,7 +317,12 @@ export default function VideoPlayerView({ videoData }) {
 
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex gap-2">
-            <Button onClick={togglePlayPause} variant="default" size="lg">
+            <Button
+              onClick={togglePlayPause}
+              variant="default"
+              size="lg"
+              disabled={!audioLoaded}
+            >
               {isPlaying ? (
                 <>
                   <Pause className="w-5 h-5 mr-2" />
@@ -258,8 +335,13 @@ export default function VideoPlayerView({ videoData }) {
                 </>
               )}
             </Button>
-            
-            <Button onClick={restartVideo} variant="outline" size="lg">
+
+            <Button
+              onClick={restartVideo}
+              variant="outline"
+              size="lg"
+              disabled={!audioLoaded}
+            >
               <RotateCcw className="w-5 h-5 mr-2" />
               Restart
             </Button>
@@ -273,16 +355,19 @@ export default function VideoPlayerView({ videoData }) {
 
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-900">
-            <strong>🎙️ Natural Voice:</strong> Using Google Cloud's WaveNet technology 
-            with authentic Indian accent in {LANGUAGE_NAMES[videoData.language]}, 
-            perfectly synced with video timeline.
+            <strong>🎙️ Natural Voice:</strong> Using Google Cloud WaveNet
+            technology with authentic Indian accent in{" "}
+            {LANGUAGE_NAMES[videoData.language]}, perfectly synced with video
+            timeline.
           </p>
         </div>
       </Card>
 
       {videoData.changes.examples && videoData.changes.examples.length > 0 && (
         <Card className="p-6 mt-6">
-          <h3 className="font-semibold text-lg mb-4">Cultural Adaptations Made:</h3>
+          <h3 className="font-semibold text-lg mb-4">
+            Cultural Adaptations Made:
+          </h3>
           <ul className="space-y-2">
             {videoData.changes.examples.map((example, index) => (
               <li key={index} className="flex items-start gap-2 text-sm">
