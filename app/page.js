@@ -10,20 +10,19 @@ import VideoInput from "../components/VideoInput";
 import VideoPlayerView from "../components/VideoPlayerView";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState("video");
+  const [tab, setTab] = useState("video");
   const [step, setStep] = useState("input");
   const [videoData, setVideoData] = useState(null);
   const [pdfData, setPdfData] = useState(null);
 
-  const handleReset = () => {
+  const reset = () => {
     setStep("input");
     setVideoData(null);
     setPdfData(null);
   };
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    handleReset();
+  const changeTab = (newTab) => {
+    setTab(newTab);
+    reset();
   };
 
   return (
@@ -41,10 +40,10 @@ export default function Home() {
             </div>
             {step !== "input" && (
               <button
-                onClick={handleReset}
-                className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={reset}
+                className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50"
               >
-                ← New {activeTab === "video" ? "Video" : "PDF"}
+                ← New {tab === "video" ? "Video" : "PDF"}
               </button>
             )}
           </div>
@@ -52,26 +51,24 @@ export default function Home() {
           {step === "input" && (
             <div className="flex gap-2 mt-4">
               <button
-                onClick={() => handleTabChange("video")}
+                onClick={() => changeTab("video")}
                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
-                  activeTab === "video"
+                  tab === "video"
                     ? "bg-gradient-to-r from-orange-600 to-green-600 text-white shadow-lg"
                     : "bg-white text-gray-600 hover:bg-gray-50 border"
                 }`}
               >
-                <Video className="w-5 h-5" />
-                Video Localization
+                <Video className="w-5 h-5" /> Video Localization
               </button>
               <button
-                onClick={() => handleTabChange("pdf")}
+                onClick={() => changeTab("pdf")}
                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
-                  activeTab === "pdf"
+                  tab === "pdf"
                     ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
                     : "bg-white text-gray-600 hover:bg-gray-50 border"
                 }`}
               >
-                <FileText className="w-5 h-5" />
-                PDF Localization
+                <FileText className="w-5 h-5" /> PDF Localization
               </button>
             </div>
           )}
@@ -79,15 +76,15 @@ export default function Home() {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        {activeTab === "video" && (
+        {tab === "video" && (
           <>
             {step === "input" && (
               <VideoInput onStartProcessing={() => setStep("processing")} />
             )}
             {step === "processing" && (
               <ProcessingView
-                onComplete={(data) => {
-                  setVideoData(data);
+                onComplete={(d) => {
+                  setVideoData(d);
                   setStep("player");
                 }}
               />
@@ -98,15 +95,15 @@ export default function Home() {
           </>
         )}
 
-        {activeTab === "pdf" && (
+        {tab === "pdf" && (
           <>
             {step === "input" && (
               <PDFInput onStartProcessing={() => setStep("processing")} />
             )}
             {step === "processing" && (
               <PDFProcessingView
-                onComplete={(data) => {
-                  setPdfData(data);
+                onComplete={(d) => {
+                  setPdfData(d);
                   setStep("viewer");
                 }}
               />
