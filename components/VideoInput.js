@@ -1,72 +1,23 @@
 "use client";
 
+import { Globe, Languages, Mic2, Sparkles } from "lucide-react";
 import { useState } from "react";
+import {
+  SUPPORTED_LANGUAGES,
+  VOICE_OPTIONS,
+  WEBSITE_TRANSLATIONS,
+} from "../lib/constants";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Globe, MapPin, Sparkles, Mic2, Languages } from "lucide-react";
-
-const SUPPORTED_LANGUAGES = [
-  { value: "hi", label: "Hindi (हिंदी)" },
-  { value: "ta", label: "Tamil (தமிழ்)" },
-  { value: "te", label: "Telugu (తెలుగు)" },
-  { value: "kn", label: "Kannada (ಕನ್ನಡ)" },
-  { value: "ml", label: "Malayalam (മലയാളം)" },
-  { value: "bn", label: "Bengali (বাংলা)" },
-  { value: "mr", label: "Marathi (मराठी)" },
-  { value: "gu", label: "Gujarati (ગુજરાતી)" },
-];
-
-const REGIONS = [
-  { value: "urban-delhi", label: "Urban Delhi" },
-  { value: "urban-mumbai", label: "Urban Mumbai" },
-  { value: "urban-bangalore", label: "Urban Bangalore" },
-  { value: "urban-chennai", label: "Urban Chennai" },
-  { value: "urban-kolkata", label: "Urban Kolkata" },
-  { value: "urban-hyderabad", label: "Urban Hyderabad" },
-  { value: "rural-punjab", label: "Rural Punjab" },
-  { value: "rural-up", label: "Rural Uttar Pradesh" },
-  { value: "rural-bihar", label: "Rural Bihar" },
-  { value: "rural-maharashtra", label: "Rural Maharashtra" },
-];
-
-const VOICE_OPTIONS = [
-  { value: "male", label: "Male Voice" },
-  { value: "female", label: "Female Voice" },
-];
-
-const WEBSITE_TRANSLATIONS = {
-  en: {
-    transformTitle: "Transform Educational Videos",
-    transformDesc: "Convert English educational content into culturally relevant Indian language versions",
-    urlLabel: "YouTube Video URL",
-    urlPlaceholder: "https://www.youtube.com/watch?v=...",
-    urlHint: "Enter any educational YouTube video with English captions",
-    targetLangLabel: "Target Language",
-    regionLabel: "Regional Context",
-    regionHint: "Adapt examples and references to this region",
-    voiceLabel: "Voice Gender",
-    websiteLangLabel: "Website Language",
-    submitButton: "🚀 Contextualize Video",
-    exampleTitle: "Example Transformation:",
-  },
-  hi: {
-    transformTitle: "शैक्षिक वीडियो को बदलें",
-    transformDesc: "अंग्रेजी शैक्षिक सामग्री को सांस्कृतिक रूप से प्रासंगिक भारतीय भाषा संस्करणों में बदलें",
-    urlLabel: "YouTube वीडियो URL",
-    urlPlaceholder: "https://www.youtube.com/watch?v=...",
-    urlHint: "अंग्रेजी कैप्शन वाला कोई भी शैक्षिक YouTube वीडियो दर्ज करें",
-    targetLangLabel: "लक्ष्य भाषा",
-    regionLabel: "क्षेत्रीय संदर्भ",
-    regionHint: "इस क्षेत्र के उदाहरण अपनाएं",
-    voiceLabel: "आवाज़ का लिंग",
-    websiteLangLabel: "वेबसाइट भाषा",
-    submitButton: "🚀 वीडियो को बदलें",
-    exampleTitle: "उदाहरण परिवर्तन:",
-  },
-};
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 export default function VideoInput({ onStartProcessing }) {
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -87,7 +38,10 @@ export default function VideoInput({ onStartProcessing }) {
       return;
     }
 
-    if (!youtubeUrl.includes("youtube.com") && !youtubeUrl.includes("youtu.be")) {
+    if (
+      !youtubeUrl.includes("youtube.com") &&
+      !youtubeUrl.includes("youtu.be")
+    ) {
       setError("Please enter a valid YouTube URL");
       return;
     }
@@ -112,7 +66,14 @@ export default function VideoInput({ onStartProcessing }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="en">English</SelectItem>
-              <SelectItem value="hi">हिंदी</SelectItem>
+              <SelectItem value="hi">हिंदी (Hindi)</SelectItem>
+              <SelectItem value="ta">தமிழ் (Tamil)</SelectItem>
+              <SelectItem value="te">తెలుగు (Telugu)</SelectItem>
+              <SelectItem value="kn">ಕನ್ನಡ (Kannada)</SelectItem>
+              <SelectItem value="ml">മലയാളം (Malayalam)</SelectItem>
+              <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
+              <SelectItem value="mr">मराठी (Marathi)</SelectItem>
+              <SelectItem value="gu">ગુજરાતી (Gujarati)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -121,9 +82,7 @@ export default function VideoInput({ onStartProcessing }) {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             {t.transformTitle}
           </h2>
-          <p className="text-gray-600">
-            {t.transformDesc}
-          </p>
+          <p className="text-gray-600">{t.transformDesc}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -139,9 +98,7 @@ export default function VideoInput({ onStartProcessing }) {
               onChange={(e) => setYoutubeUrl(e.target.value)}
               className="text-lg"
             />
-            <p className="text-xs text-gray-500">
-              {t.urlHint}
-            </p>
+            <p className="text-xs text-gray-500">{t.urlHint}</p>
           </div>
 
           <div className="space-y-2">
@@ -161,28 +118,6 @@ export default function VideoInput({ onStartProcessing }) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              {t.regionLabel}
-            </label>
-            <Select value={region} onValueChange={setRegion}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {REGIONS.map((reg) => (
-                  <SelectItem key={reg.value} value={reg.value}>
-                    {reg.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              {t.regionHint}
-            </p>
           </div>
 
           <div className="space-y-2">
@@ -213,7 +148,10 @@ export default function VideoInput({ onStartProcessing }) {
             </Alert>
           )}
 
-          <Button type="submit" className="w-full text-lg py-6 bg-gradient-to-r from-orange-600 to-green-600 hover:from-orange-700 hover:to-green-700">
+          <Button
+            type="submit"
+            className="w-full text-lg py-6 bg-gradient-to-r from-orange-600 to-green-600 hover:from-orange-700 hover:to-green-700"
+          >
             {t.submitButton}
           </Button>
         </form>

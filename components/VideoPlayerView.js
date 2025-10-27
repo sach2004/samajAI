@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Pause, Play, RotateCcw } from "lucide-react";
+import { BookOpen, Download, Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -23,9 +23,13 @@ export default function VideoPlayerView({ videoData }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSubtitle, setCurrentSubtitle] = useState("");
   const [audioLoaded, setAudioLoaded] = useState(false);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [videoEnded, setVideoEnded] = useState(false);
   const audioContextRef = useRef(null);
-  const audioSourcesRef = useRef([]);
+  const scheduledSourcesRef = useRef([]);
   const audioBuffersRef = useRef([]);
+  const currentSegmentIndexRef = useRef(0);
+  const lastPlayTimeRef = useRef(0);
 
   useEffect(() => {
     console.log("VideoPlayerView mounted", videoData.audioSegments?.length);
@@ -54,20 +58,24 @@ export default function VideoPlayerView({ videoData }) {
             console.log("Player state:", event.data);
 
             if (event.data === 1) {
+              // Playing
               setIsPlaying(true);
-              setTimeout(() => {
-                if (
-                  audioBuffersRef.current.length > 0 &&
-                  audioContextRef.current
-                ) {
-                  playAudioTrack(event.target);
-                }
-              }, 200);
+              const currentTime = event.target.getCurrentTime();
+              if (Math.abs(currentTime - lastPlayTimeRef.current) > 1) {
+                // User seeked
+                stopAllAudio();
+                currentSegmentIndexRef.current = findSegmentIndex(currentTime);
+              }
+              lastPlayTimeRef.current = currentTime;
+              playAudioFromCurrentTime(event.target);
             } else if (event.data === 2) {
+              // Paused
               setIsPlaying(false);
               stopAllAudio();
             } else if (event.data === 0) {
+              // Ended
               setIsPlaying(false);
+              setVideoEnded(true);
               stopAllAudio();
             }
           },
@@ -83,6 +91,19 @@ export default function VideoPlayerView({ videoData }) {
       stopAllAudio();
     };
   }, []);
+
+  const findSegmentIndex = (currentTime) => {
+    for (let i = 0; i < audioBuffersRef.current.length; i++) {
+      const segment = audioBuffersRef.current[i];
+      if (
+        currentTime >= segment.start &&
+        currentTime < segment.start + segment.duration
+      ) {
+        return i;
+      }
+    }
+    return 0;
+  };
 
   const preloadAudio = async () => {
     console.log("Preloading audio segments...");
@@ -125,32 +146,114 @@ export default function VideoPlayerView({ videoData }) {
       }
     }
 
-    console.log(`Loaded ${loadedCount} audio segments`);
+    console.log(`✅ Loaded ${loadedCount} audio segments`);
     setAudioLoaded(true);
   };
 
-  const onPlayerReady = (event) => {
-    console.log("YouTube player ready");
-    event.target.mute();
-    setPlayer(event.target);
+  const playAudioFromCurrentTime = async (playerInstance) => {
+    const activePlayer = playerInstance || player;
+
+    if (!audioContextRef.current || !activePlayer) {
+      console.error("Missing audio context or player");
+      return;
+    }
+
+    if (audioBuffersRef.current.length === 0) {
+      console.error("No audio buffers loaded");
+      return;
+    }
+
+    stopAllAudio();
+
+    const currentVideoTime = activePlayer.getCurrentTime();
+    const audioContext = audioContextRef.current;
+
+    console.log("🎵 Starting audio from:", currentVideoTime.toFixed(2));
+
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+
+    // Find the current segment index
+    let startIndex = currentSegmentIndexRef.current;
+    for (let i = 0; i < audioBuffersRef.current.length; i++) {
+      const segment = audioBuffersRef.current[i];
+      if (
+        currentVideoTime >= segment.start &&
+        currentVideoTime < segment.start + segment.duration
+      ) {
+        startIndex = i;
+        break;
+      } else if (currentVideoTime < segment.start) {
+        startIndex = i;
+        break;
+      }
+    }
+
+    currentSegmentIndexRef.current = startIndex;
+
+    // Schedule only upcoming segments
+    let cumulativeDelay = 0;
+    for (let i = startIndex; i < audioBuffersRef.current.length; i++) {
+      const audioData = audioBuffersRef.current[i];
+      const segmentStartTime = audioData.start;
+
+      // Calculate delay from current video time
+      let delay = segmentStartTime - currentVideoTime;
+
+      // If we're in the middle of a segment, play from the beginning
+      if (
+        i === startIndex &&
+        currentVideoTime > segmentStartTime &&
+        currentVideoTime < segmentStartTime + audioData.duration
+      ) {
+        delay = 0;
+      }
+
+      if (delay < 0 && i !== startIndex) {
+        // Skip segments that have already passed
+        continue;
+      }
+
+      try {
+        const source = audioContext.createBufferSource();
+        source.buffer = audioData.buffer;
+        source.connect(audioContext.destination);
+
+        const scheduledTime = audioContext.currentTime + Math.max(0, delay);
+
+        source.start(scheduledTime);
+        scheduledSourcesRef.current.push(source);
+
+        console.log(
+          `📢 Scheduled segment ${i}: "${audioData.text.substring(
+            0,
+            30
+          )}" at +${delay.toFixed(2)}s`
+        );
+
+        // Set up next segment to play after this one ends
+        source.onended = () => {
+          currentSegmentIndexRef.current = i + 1;
+        };
+      } catch (error) {
+        console.error("Error scheduling audio:", error);
+      }
+    }
+
+    console.log(`✅ Scheduled ${scheduledSourcesRef.current.length} segments`);
   };
 
-  const onPlayerStateChange = (event) => {
-    console.log("Player state:", event.data);
-
-    if (event.data === 1) {
-      // Playing
-      setIsPlaying(true);
-      setTimeout(() => playAudioTrack(), 100);
-    } else if (event.data === 2) {
-      // Paused
-      setIsPlaying(false);
-      stopAllAudio();
-    } else if (event.data === 0) {
-      // Ended
-      setIsPlaying(false);
-      stopAllAudio();
-    }
+  const stopAllAudio = () => {
+    scheduledSourcesRef.current.forEach((source) => {
+      try {
+        source.stop();
+        source.disconnect();
+      } catch (e) {
+        // Already stopped
+      }
+    });
+    scheduledSourcesRef.current = [];
   };
 
   useEffect(() => {
@@ -178,84 +281,6 @@ export default function VideoPlayerView({ videoData }) {
     }
   };
 
-  const playAudioTrack = async (playerInstance) => {
-    const activePlayer = playerInstance || player;
-
-    if (!audioContextRef.current || !activePlayer) {
-      console.error("Missing audio context or player");
-      return;
-    }
-
-    if (audioBuffersRef.current.length === 0) {
-      console.error("No audio buffers loaded");
-      return;
-    }
-
-    stopAllAudio();
-
-    const currentVideoTime = activePlayer.getCurrentTime();
-    const audioContext = audioContextRef.current;
-
-    console.log("Starting audio from:", currentVideoTime);
-
-    if (audioContext.state === "suspended") {
-      await audioContext.resume();
-    }
-
-    let scheduledCount = 0;
-    let lastEndTime = 0;
-
-    for (const audioData of audioBuffersRef.current) {
-      const segmentStartTime = audioData.start - currentVideoTime;
-
-      // Only play segments that haven't passed
-      if (segmentStartTime >= -0.3) {
-        try {
-          const source = audioContext.createBufferSource();
-          source.buffer = audioData.buffer;
-          source.connect(audioContext.destination);
-
-          // Calculate when to start this audio
-          const scheduledTime =
-            audioContext.currentTime + Math.max(0, segmentStartTime);
-
-          // Ensure no overlap - start after previous audio ends
-          const actualStartTime = Math.max(scheduledTime, lastEndTime);
-
-          source.start(actualStartTime);
-
-          // Track when this audio will end
-          lastEndTime = actualStartTime + audioData.buffer.duration;
-
-          audioSourcesRef.current.push(source);
-          scheduledCount++;
-
-          console.log(
-            `Scheduled: "${audioData.text.substring(
-              0,
-              20
-            )}" at ${actualStartTime.toFixed(2)}s`
-          );
-        } catch (error) {
-          console.error("Error scheduling audio:", error);
-        }
-      }
-    }
-
-    console.log(`Scheduled ${scheduledCount} audio segments without overlap`);
-  };
-
-  const stopAllAudio = () => {
-    audioSourcesRef.current.forEach((source) => {
-      try {
-        source.stop();
-      } catch (e) {
-        // Already stopped
-      }
-    });
-    audioSourcesRef.current = [];
-  };
-
   const togglePlayPause = () => {
     if (!player) return;
 
@@ -270,6 +295,9 @@ export default function VideoPlayerView({ videoData }) {
     if (!player) return;
 
     stopAllAudio();
+    currentSegmentIndexRef.current = 0;
+    lastPlayTimeRef.current = 0;
+    setVideoEnded(false);
     player.seekTo(0);
     player.playVideo();
   };
@@ -388,6 +416,18 @@ export default function VideoPlayerView({ videoData }) {
               <RotateCcw className="w-5 h-5 mr-2" />
               Restart
             </Button>
+
+            {videoEnded && (
+              <Button
+                onClick={() => setShowQuiz(true)}
+                variant="default"
+                size="lg"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              >
+                <BookOpen className="w-5 h-5 mr-2" />
+                Start Quiz
+              </Button>
+            )}
           </div>
 
           <Button onClick={downloadSubtitles} variant="outline" size="lg">
@@ -405,6 +445,30 @@ export default function VideoPlayerView({ videoData }) {
           </p>
         </div>
       </Card>
+
+      {showQuiz && (
+        <Card className="p-6 mt-6 border-2 border-purple-500">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-2xl font-bold text-gray-900">
+              📝 Test Your Knowledge
+            </h3>
+            <Button
+              onClick={() => setShowQuiz(false)}
+              variant="outline"
+              size="sm"
+            >
+              Close
+            </Button>
+          </div>
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">
+              Quiz feature coming soon! This will generate AI-powered questions
+              based on the video content in {LANGUAGE_NAMES[videoData.language]}
+              .
+            </p>
+          </div>
+        </Card>
+      )}
 
       {videoData.changes.examples && videoData.changes.examples.length > 0 && (
         <Card className="p-6 mt-6">
