@@ -1,23 +1,15 @@
 "use client";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Card } from "./ui/card";
+import { Progress } from "./ui/progress";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 const PROCESSING_STEPS = [
-  {
-    id: "extract",
-    label: "Extracting transcript from YouTube...",
-    duration: 3000,
-  },
+  { id: "extract", label: "Extracting transcript from YouTube...", duration: 3000 },
   { id: "analyze", label: "Analyzing content...", duration: 2000 },
-  {
-    id: "contextualize",
-    label: "AI contextualizing for target language...",
-    duration: 8000,
-  },
+  { id: "contextualize", label: "AI contextualizing for target language...", duration: 8000 },
   { id: "audio", label: "Generating natural voice audio...", duration: 5000 },
   { id: "finalize", label: "Finalizing your video...", duration: 2000 },
 ];
@@ -50,7 +42,7 @@ export default function ProcessingView({ onComplete }) {
       }
 
       const { videoId, transcript } = await transcriptResponse.json();
-
+      
       await simulateProgress(0, 20);
       setCurrentStep(1);
 
@@ -73,9 +65,8 @@ export default function ProcessingView({ onComplete }) {
         throw new Error(errorData.error || "Failed to contextualize");
       }
 
-      const { contextualizedTranscript, changes } =
-        await contextualizeResponse.json();
-
+      const { contextualizedTranscript, changes } = await contextualizeResponse.json();
+      
       await simulateProgress(30, 60);
       setCurrentStep(3);
 
@@ -121,7 +112,7 @@ export default function ProcessingView({ onComplete }) {
     return new Promise((resolve) => {
       const step = (to - from) / 20;
       let current = from;
-
+      
       const interval = setInterval(() => {
         current += step;
         if (current >= to) {
@@ -189,8 +180,7 @@ export default function ProcessingView({ onComplete }) {
 
             <div className="mt-8 p-4 bg-gradient-to-r from-orange-50 to-green-50 rounded-lg">
               <p className="text-xs text-gray-600 text-center">
-                🎙️ Using Google Cloud&apos;s WaveNet voices for natural Indian
-                accent!
+                🎙️ Using Google Cloud's WaveNet voices for natural Indian accent!
               </p>
             </div>
           </>

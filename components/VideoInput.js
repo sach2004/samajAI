@@ -1,19 +1,36 @@
 "use client";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { REGIONS, SUPPORTED_LANGUAGES } from "@/lib/constants";
-import { Globe, MapPin, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { Alert, AlertDescription } from "./ui/alert";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { Input } from "./ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Globe, MapPin, Sparkles } from "lucide-react";
+
+const SUPPORTED_LANGUAGES = [
+  { value: "hi", label: "Hindi (हिंदी)" },
+  { value: "ta", label: "Tamil (தமிழ்)" },
+  { value: "te", label: "Telugu (తెలుగు)" },
+  { value: "kn", label: "Kannada (ಕನ್ನಡ)" },
+  { value: "ml", label: "Malayalam (മലയാളം)" },
+  { value: "bn", label: "Bengali (বাংলা)" },
+  { value: "mr", label: "Marathi (मराठी)" },
+  { value: "gu", label: "Gujarati (ગુજરાતી)" },
+];
+
+const REGIONS = [
+  { value: "urban-delhi", label: "Urban Delhi" },
+  { value: "urban-mumbai", label: "Urban Mumbai" },
+  { value: "urban-bangalore", label: "Urban Bangalore" },
+  { value: "urban-chennai", label: "Urban Chennai" },
+  { value: "urban-kolkata", label: "Urban Kolkata" },
+  { value: "urban-hyderabad", label: "Urban Hyderabad" },
+  { value: "rural-punjab", label: "Rural Punjab" },
+  { value: "rural-up", label: "Rural Uttar Pradesh" },
+  { value: "rural-bihar", label: "Rural Bihar" },
+  { value: "rural-maharashtra", label: "Rural Maharashtra" },
+];
 
 export default function VideoInput({ onStartProcessing }) {
   const [youtubeUrl, setYoutubeUrl] = useState("");
@@ -30,10 +47,7 @@ export default function VideoInput({ onStartProcessing }) {
       return;
     }
 
-    if (
-      !youtubeUrl.includes("youtube.com") &&
-      !youtubeUrl.includes("youtu.be")
-    ) {
+    if (!youtubeUrl.includes("youtube.com") && !youtubeUrl.includes("youtu.be")) {
       setError("Please enter a valid YouTube URL");
       return;
     }
@@ -53,8 +67,7 @@ export default function VideoInput({ onStartProcessing }) {
             Transform Educational Videos
           </h2>
           <p className="text-gray-600">
-            Convert English educational content into culturally relevant Indian
-            language versions
+            Convert English educational content into culturally relevant Indian language versions
           </p>
         </div>
 
@@ -123,10 +136,7 @@ export default function VideoInput({ onStartProcessing }) {
             </Alert>
           )}
 
-          <Button
-            type="submit"
-            className="w-full text-lg py-6 bg-gradient-to-r from-orange-600 to-green-600 hover:from-orange-700 hover:to-green-700"
-          >
+          <Button type="submit" className="w-full text-lg py-6 bg-gradient-to-r from-orange-600 to-green-600 hover:from-orange-700 hover:to-green-700">
             🚀 Contextualize Video
           </Button>
         </form>
@@ -136,12 +146,8 @@ export default function VideoInput({ onStartProcessing }) {
             Example Transformation:
           </h3>
           <div className="space-y-1 text-xs text-blue-800">
-            <p>
-              🇺🇸 Original: &quot;Buy 5 apples at $2 each from the store...&quot;
-            </p>
-            <p>
-              🇮🇳 Hindi: &quot;5 आम ₹40 प्रति किलो सब्जी मंडी से खरीदें...&quot;
-            </p>
+            <p>🇺🇸 Original: "Buy 5 apples at $2 each from the store..."</p>
+            <p>🇮🇳 Hindi: "5 आम ₹40 प्रति किलो सब्जी मंडी से खरीदें..."</p>
           </div>
         </div>
       </Card>

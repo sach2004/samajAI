@@ -1,11 +1,7 @@
 import * as React from "react"
+import { cn } from "../../lib/utils"
 
-import { cn } from "@/lib/utils"
-
-function Card({
-  className,
-  ...props
-}) {
+function Card({ className, ...props }) {
   return (
     <div
       data-slot="card"
@@ -17,10 +13,7 @@ function Card({
   );
 }
 
-function CardHeader({
-  className,
-  ...props
-}) {
+function CardHeader({ className, ...props }) {
   return (
     <div
       data-slot="card-header"
@@ -32,10 +25,7 @@ function CardHeader({
   );
 }
 
-function CardTitle({
-  className,
-  ...props
-}) {
+function CardTitle({ className, ...props }) {
   return (
     <div
       data-slot="card-title"
@@ -44,10 +34,7 @@ function CardTitle({
   );
 }
 
-function CardDescription({
-  className,
-  ...props
-}) {
+function CardDescription({ className, ...props }) {
   return (
     <div
       data-slot="card-description"
@@ -56,10 +43,7 @@ function CardDescription({
   );
 }
 
-function CardAction({
-  className,
-  ...props
-}) {
+function CardAction({ className, ...props }) {
   return (
     <div
       data-slot="card-action"
@@ -71,17 +55,11 @@ function CardAction({
   );
 }
 
-function CardContent({
-  className,
-  ...props
-}) {
+function CardContent({ className, ...props }) {
   return (<div data-slot="card-content" className={cn("px-6", className)} {...props} />);
 }
 
-function CardFooter({
-  className,
-  ...props
-}) {
+function CardFooter({ className, ...props }) {
   return (
     <div
       data-slot="card-footer"

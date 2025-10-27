@@ -1,9 +1,9 @@
 "use client";
 
-import ProcessingView from "@/components/ProcessingView";
-import VideoInput from "@/components/VideoInput";
-import VideoPlayerView from "@/components/VideoPlayerView";
 import { useState } from "react";
+import VideoInput from "../components/VideoInput";
+import ProcessingView from "../components/ProcessingView";
+import VideoPlayerView from "../components/VideoPlayerView";
 
 export default function Home() {
   const [step, setStep] = useState("input");

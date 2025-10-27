@@ -1,11 +1,21 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { LANGUAGE_NAMES } from "@/lib/constants";
-import { Download, Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { Download, Pause, Play, RotateCcw } from "lucide-react";
+
+const LANGUAGE_NAMES = {
+  hi: "Hindi",
+  ta: "Tamil",
+  te: "Telugu",
+  kn: "Kannada",
+  ml: "Malayalam",
+  bn: "Bengali",
+  mr: "Marathi",
+  gu: "Gujarati",
+};
 
 export default function VideoPlayerView({ videoData }) {
   const playerRef = useRef(null);
@@ -38,8 +48,7 @@ export default function VideoPlayerView({ videoData }) {
       setPlayer(newPlayer);
     };
 
-    audioContextRef.current = new (window.AudioContext ||
-      window.webkitAudioContext)();
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
 
     return () => {
       stopAllAudio();
@@ -80,7 +89,7 @@ export default function VideoPlayerView({ videoData }) {
     const currentSegment = videoData.audioSegments.find(
       (seg) => time >= seg.start && time < seg.start + seg.duration
     );
-
+    
     if (currentSegment) {
       setCurrentSubtitle(currentSegment.text);
     } else {
@@ -102,7 +111,7 @@ export default function VideoPlayerView({ videoData }) {
 
     for (const segment of videoData.audioSegments) {
       const startTime = segment.start - currentVideoTime;
-
+      
       if (startTime >= -0.1 && segment.audioBase64) {
         try {
           const audioData = atob(segment.audioBase64);
@@ -130,7 +139,7 @@ export default function VideoPlayerView({ videoData }) {
   };
 
   const stopAllAudio = () => {
-    audioSourcesRef.current.forEach((source) => {
+    audioSourcesRef.current.forEach(source => {
       try {
         source.stop();
       } catch (e) {
@@ -152,20 +161,18 @@ export default function VideoPlayerView({ videoData }) {
 
   const restartVideo = () => {
     if (!player) return;
-
+    
     stopAllAudio();
     player.seekTo(0);
     player.playVideo();
   };
 
   const downloadSubtitles = () => {
-    const srtContent = videoData.audioSegments
-      .map((seg, index) => {
-        const startTime = formatSRTTime(seg.start);
-        const endTime = formatSRTTime(seg.start + seg.duration);
-        return `${index + 1}\n${startTime} --> ${endTime}\n${seg.text}\n`;
-      })
-      .join("\n");
+    const srtContent = videoData.audioSegments.map((seg, index) => {
+      const startTime = formatSRTTime(seg.start);
+      const endTime = formatSRTTime(seg.start + seg.duration);
+      return `${index + 1}\n${startTime} --> ${endTime}\n${seg.text}\n`;
+    }).join("\n");
 
     const blob = new Blob([srtContent], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -180,10 +187,7 @@ export default function VideoPlayerView({ videoData }) {
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 1000);
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-      2,
-      "0"
-    )}:${String(secs).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
   };
 
   return (
@@ -199,15 +203,12 @@ export default function VideoPlayerView({ videoData }) {
                 {LANGUAGE_NAMES[videoData.language]}
               </Badge>
               <Badge variant="secondary">{videoData.region}</Badge>
-              <Badge
-                variant="secondary"
-                className="bg-green-100 text-green-800"
-              >
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
                 WaveNet Voice
               </Badge>
             </div>
           </div>
-
+          
           <div className="flex gap-4 text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
@@ -257,7 +258,7 @@ export default function VideoPlayerView({ videoData }) {
                 </>
               )}
             </Button>
-
+            
             <Button onClick={restartVideo} variant="outline" size="lg">
               <RotateCcw className="w-5 h-5 mr-2" />
               Restart
@@ -272,19 +273,16 @@ export default function VideoPlayerView({ videoData }) {
 
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-900">
-            <strong>🎙️ Natural Voice:</strong> Using Google Cloud&apos;s WaveNet
-            technology with authentic Indian accent in{" "}
-            {LANGUAGE_NAMES[videoData.language]}, perfectly synced with video
-            timeline.
+            <strong>🎙️ Natural Voice:</strong> Using Google Cloud's WaveNet technology 
+            with authentic Indian accent in {LANGUAGE_NAMES[videoData.language]}, 
+            perfectly synced with video timeline.
           </p>
         </div>
       </Card>
 
       {videoData.changes.examples && videoData.changes.examples.length > 0 && (
         <Card className="p-6 mt-6">
-          <h3 className="font-semibold text-lg mb-4">
-            Cultural Adaptations Made:
-          </h3>
+          <h3 className="font-semibold text-lg mb-4">Cultural Adaptations Made:</h3>
           <ul className="space-y-2">
             {videoData.changes.examples.map((example, index) => (
               <li key={index} className="flex items-start gap-2 text-sm">
