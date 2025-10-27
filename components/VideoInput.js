@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, Languages, Mic2, Sparkles } from "lucide-react";
+import { Globe, Languages, Mic2, Youtube } from "lucide-react";
 import { useState } from "react";
 import {
   SUPPORTED_LANGUAGES,
@@ -55,56 +55,29 @@ export default function VideoInput({ onStartProcessing }) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto mt-12">
-      <Card className="p-8 shadow-xl border-2">
-        {/* Website Language Selector */}
-        <div className="flex justify-end mb-4">
-          <Select value={websiteLang} onValueChange={setWebsiteLang}>
-            <SelectTrigger className="w-fit">
-              <Languages className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="hi">हिंदी (Hindi)</SelectItem>
-              <SelectItem value="ta">தமிழ் (Tamil)</SelectItem>
-              <SelectItem value="te">తెలుగు (Telugu)</SelectItem>
-              <SelectItem value="kn">ಕನ್ನಡ (Kannada)</SelectItem>
-              <SelectItem value="ml">മലയാളം (Malayalam)</SelectItem>
-              <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
-              <SelectItem value="mr">मराठी (Marathi)</SelectItem>
-              <SelectItem value="gu">ગુજરાતી (Gujarati)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            {t.transformTitle}
-          </h2>
-          <p className="text-gray-600">{t.transformDesc}</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <div>
+      <Card className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              {t.urlLabel}
+            <label className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Youtube className="w-4 h-4" />
+              YouTube Video URL
             </label>
             <Input
               type="text"
-              placeholder={t.urlPlaceholder}
+              placeholder="https://www.youtube.com/watch?v=..."
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
-              className="text-lg"
             />
-            <p className="text-xs text-gray-500">{t.urlHint}</p>
+            <p className="text-xs text-muted-foreground font-bold">
+              Enter any educational YouTube video with English captions
+            </p>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <label className="text-sm font-bold text-foreground flex items-center gap-2">
               <Globe className="w-4 h-4" />
-              {t.targetLangLabel}
+              Target Language
             </label>
             <Select value={language} onValueChange={setLanguage}>
               <SelectTrigger>
@@ -121,9 +94,9 @@ export default function VideoInput({ onStartProcessing }) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <label className="text-sm font-bold text-foreground flex items-center gap-2">
               <Mic2 className="w-4 h-4" />
-              {t.voiceLabel}
+              Voice Gender
             </label>
             <Select value={voiceGender} onValueChange={setVoiceGender}>
               <SelectTrigger>
@@ -137,9 +110,6 @@ export default function VideoInput({ onStartProcessing }) {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-gray-500">
-              Choose voice that matches the video narrator
-            </p>
           </div>
 
           {error && (
@@ -148,21 +118,20 @@ export default function VideoInput({ onStartProcessing }) {
             </Alert>
           )}
 
-          <Button
-            type="submit"
-            className="w-full text-lg py-6 bg-gradient-to-r from-orange-600 to-green-600 hover:from-orange-700 hover:to-green-700"
-          >
-            {t.submitButton}
+          <Button type="submit" className="w-full" size="lg" variant="default">
+            🚀 Process Video
           </Button>
         </form>
 
-        <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-          <h3 className="font-semibold text-sm text-blue-900 mb-2">
-            {t.exampleTitle}
+        <div className="mt-6 p-4 bg-[#f3d2c1] border-3 border-black rounded-xl">
+          <h3 className="font-black text-sm text-foreground mb-2">
+            What We Do:
           </h3>
-          <div className="space-y-1 text-xs text-blue-800">
-            <p>🇺🇸 Original: "Buy 5 apples at $2 each from the store..."</p>
-            <p>🇮🇳 Hindi: "5 आम ₹40 प्रति किलो सब्जी मंडी से खरीदें..."</p>
+          <div className="space-y-1 text-xs text-muted-foreground font-bold">
+            <p>✓ Extract transcript from YouTube video</p>
+            <p>✓ Translate to your chosen language</p>
+            <p>✓ Adapt cultural examples ($ → ₹, Pizza → Dosa)</p>
+            <p>✓ Generate natural voice audio</p>
           </div>
         </div>
       </Card>

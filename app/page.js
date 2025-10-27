@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Video } from "lucide-react";
+import { FileText, Sparkles, Video } from "lucide-react";
 import { useState } from "react";
 import PDFInput from "../components/PDFInput";
 import PDFProcessingView from "../components/PDFProcessingView";
@@ -26,92 +26,139 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+    <main className="min-h-screen bg-background">
+      <header className="border-b-4 border-black sticky top-0 z-50 bg-white">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-green-600 bg-clip-text text-transparent">
-                ContextAI 🌏
+              <h1 className="text-3xl font-black text-foreground">
+                Context<span className="text-[#f582ae]">AI</span>
               </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Make EdTech Feel Like Home
+              <p className="text-sm text-muted-foreground font-bold mt-0.5">
+                Cultural Localization Platform
               </p>
             </div>
             {step !== "input" && (
               <button
                 onClick={reset}
-                className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50"
+                className="px-5 py-2 text-sm font-bold border-3 border-black rounded-xl bg-white hover:bg-accent transition-colors shadow-cartoon-sm"
               >
-                ← New {tab === "video" ? "Video" : "PDF"}
+                ← Back
               </button>
             )}
           </div>
-
-          {step === "input" && (
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={() => changeTab("video")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
-                  tab === "video"
-                    ? "bg-gradient-to-r from-orange-600 to-green-600 text-white shadow-lg"
-                    : "bg-white text-gray-600 hover:bg-gray-50 border"
-                }`}
-              >
-                <Video className="w-5 h-5" /> Video Localization
-              </button>
-              <button
-                onClick={() => changeTab("pdf")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all ${
-                  tab === "pdf"
-                    ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
-                    : "bg-white text-gray-600 hover:bg-gray-50 border"
-                }`}
-              >
-                <FileText className="w-5 h-5" /> PDF Localization
-              </button>
-            </div>
-          )}
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
-        {tab === "video" && (
-          <>
-            {step === "input" && (
-              <VideoInput onStartProcessing={() => setStep("processing")} />
-            )}
-            {step === "processing" && (
-              <ProcessingView
-                onComplete={(d) => {
-                  setVideoData(d);
-                  setStep("player");
-                }}
-              />
-            )}
-            {step === "player" && videoData && (
-              <VideoPlayerView videoData={videoData} />
-            )}
-          </>
-        )}
+      {step === "input" && (
+        <div className="container mx-auto px-6 py-12 max-w-4xl text-center">
+          <div className="flex justify-center mb-6">
+            <Sparkles className="w-12 h-12 text-[#f582ae] animate-float" />
+          </div>
 
-        {tab === "pdf" && (
-          <>
-            {step === "input" && (
-              <PDFInput onStartProcessing={() => setStep("processing")} />
+          <h2 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
+            Transform Educational Content
+            <br />
+            Into Your Language
+          </h2>
+
+          <p className="text-lg text-muted-foreground font-bold max-w-2xl mx-auto">
+            AI-powered platform that translates English educational videos and
+            PDFs into culturally-relevant Indian language versions with natural
+            voice and localized examples.
+          </p>
+        </div>
+      )}
+
+      {/* MODIFIED CONTENT SECTION */}
+      <div className="container mx-auto px-6 py-8 flex justify-center">
+        <div className="w-full mb-8 max-w-2xl relative">
+          {/* 👇 MODIFIED PILL POSITIONING: Added mt-[-55px] and mb-[-35px] for the gap */}
+          {step === "input" && (
+            <div
+              className="absolute left-1/2 transform -translate-x-1/2 z-10"
+              // Increase negative margin to pull up more, then add negative bottom margin
+              // We'll rely on the 'mt-8' on the form content below to manage the final gap.
+              style={{ marginTop: "-65px", marginBottom: "-35px" }}
+            >
+              <div className="flex gap-2 p-2 rounded-full border-3 border-black shadow-cartoon-sm bg-white">
+                <button
+                  onClick={() => changeTab("video")}
+                  className={`flex items-center justify-center gap-2 px-5 py-3 rounded-full font-bold transition-all ${
+                    tab === "video"
+                      ? "bg-[#f582ae] text-white"
+                      : "text-foreground hover:bg-[#f3d2c1]"
+                  }`}
+                >
+                  <Video className="w-5 h-5" />
+                  <span>Video</span>
+                </button>
+                <button
+                  onClick={() => changeTab("pdf")}
+                  className={`flex items-center justify-center gap-2 px-5 py-3 rounded-full font-bold transition-all ${
+                    tab === "pdf"
+                      ? "bg-[#8bd3dd] text-foreground"
+                      : "text-foreground hover:bg-[#f3d2c1]"
+                  }`}
+                >
+                  <FileText className="w-5 h-5" />
+                  <span>PDF</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 👇 MODIFIED FORM CONTENT: Reduced mt-8 to mt-4 to compensate for selector height */}
+          <div className="mt-4">
+            {tab === "video" && (
+              <>
+                {step === "input" && (
+                  <VideoInput onStartProcessing={() => setStep("processing")} />
+                )}
+                {step === "processing" && (
+                  <ProcessingView
+                    onComplete={(d) => {
+                      setVideoData(d);
+                      setStep("player");
+                    }}
+                  />
+                )}
+                {step === "player" && videoData && (
+                  <VideoPlayerView videoData={videoData} />
+                )}
+              </>
             )}
-            {step === "processing" && (
-              <PDFProcessingView
-                onComplete={(d) => {
-                  setPdfData(d);
-                  setStep("viewer");
-                }}
-              />
+            {tab === "pdf" && (
+              <>
+                {step === "input" && (
+                  <PDFInput onStartProcessing={() => setStep("processing")} />
+                )}
+                {step === "processing" && (
+                  <PDFProcessingView
+                    onComplete={(d) => {
+                      setPdfData(d);
+                      setStep("viewer");
+                    }}
+                  />
+                )}
+                {step === "viewer" && pdfData && (
+                  <PDFViewer pdfData={pdfData} />
+                )}
+              </>
             )}
-            {step === "viewer" && pdfData && <PDFViewer pdfData={pdfData} />}
-          </>
-        )}
+          </div>
+        </div>
       </div>
+      {/* END OF MODIFIED CONTENT SECTION */}
+
+      <footer className="border-t-4 border-black mt-16 py-6 bg-white">
+        <div className="container mx-auto px-6 text-center">
+          <p className="text-sm font-bold text-muted-foreground">
+            Built with Next.js, Tailwind CSS, Google Gemini AI & Cloud
+            Text-to-Speech
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }

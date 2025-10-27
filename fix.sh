@@ -1,493 +1,160 @@
 #!/bin/bash
 
-echo "🔥 Removing all @/ aliases..."
+echo "🔧 Fixing layout..."
 
-# Fix app/api/contextualize/route.js
-cat > app/api/contextualize/route.js << 'EOF'
-import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { prisma } from "../../../lib/prisma";
-import { LANGUAGE_NAMES } from "../../../lib/constants";
+cat > app/page.js << 'EOF'
+"use client";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import { FileText, Sparkles, Video } from "lucide-react";
+import { useState } from "react";
+import PDFInput from "../components/PDFInput";
+import PDFProcessingView from "../components/PDFProcessingView";
+import PDFViewer from "../components/PDFViewer";
+import ProcessingView from "../components/ProcessingView";
+import VideoInput from "../components/VideoInput";
+import VideoPlayerView from "../components/VideoPlayerView";
 
-export async function POST(request) {
-  const startTime = Date.now();
+export default function Home() {
+  const [tab, setTab] = useState("video");
+  const [step, setStep] = useState("input");
+  const [videoData, setVideoData] = useState(null);
+  const [pdfData, setPdfData] = useState(null);
 
-  try {
-    const { videoId, transcript, targetLanguage, region } = await request.json();
-
-    const video = await prisma.video.findUnique({
-      where: { videoId },
-      include: {
-        transcripts: {
-          where: {
-            type: "contextualized",
-            language: targetLanguage,
-          },
-        },
-      },
-    });
-
-    if (video && video.transcripts.length > 0) {
-      const changes = await getChangesFromSession(video.id, targetLanguage, region);
-      
-      return NextResponse.json({
-        contextualizedTranscript: video.transcripts[0].segments,
-        changes,
-        cached: true,
-      });
-    }
-
-    const languageName = LANGUAGE_NAMES[targetLanguage] || "Hindi";
-
-    const prompt = `You are an expert educational content localizer specializing in Indian cultural contextualization.
-
-TASK: Translate and recontextualize this English educational video transcript into ${languageName} for students in ${region}.
-
-CRITICAL RULES:
-1. **PRESERVE EXACT TIMESTAMPS**: Do NOT modify "start" or "duration" values AT ALL
-2. **Translate accurately** to ${languageName}
-3. **Recontextualize examples** to Indian context:
-   - Currency: $ → ₹, dollars → rupees, cents → paisa
-   - Locations: Store/Walmart → Sabzi mandi/Kirana store, Restaurant → Dhaba/Local eatery
-   - Food: Hamburger → Samosa/Vada pav, Apple pie → Gulab jamun, Pizza → Dosa, Apples → Mangoes
-   - Names: John → Rahul, Sarah → Priya, Michael → Arjun, Emma → Anjali
-   - Measurements: °F → °C, miles → km, feet → meters, pounds → kg
-   - Sports: Baseball → Cricket, American Football → Football/Cricket
-   - Holidays: Thanksgiving → Diwali, Christmas → Holi, Halloween → Navratri
-4. **Keep educational concept identical** - only change examples
-5. **Use natural, conversational language** appropriate for ${region} students
-6. **Regional considerations**:
-   - Urban regions: Modern shops, malls acceptable
-   - Rural regions: Weekly haats, local markets, village context
-
-INPUT TRANSCRIPT:
-${JSON.stringify(transcript, null, 2)}
-
-OUTPUT FORMAT: Return ONLY a valid JSON array. No markdown, no code blocks, no explanations.
-[{
-  "text": "translated and contextualized text in ${languageName}",
-  "start": <EXACT same number as input>,
-  "duration": <EXACT same number as input>
-}, ...]
-
-CRITICAL: Start your response with [ and end with ]. No other text.`;
-
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      },
-    });
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const responseText = response.text();
-
-    let contextualizedTranscript;
-    try {
-      const jsonText = responseText
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
-
-      contextualizedTranscript = JSON.parse(jsonText);
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError);
-      console.error("Response text:", responseText);
-      throw new Error("Failed to parse response. Please try again.");
-    }
-
-    if (!Array.isArray(contextualizedTranscript)) {
-      throw new Error("Invalid response format");
-    }
-
-    const changes = detectChanges(transcript, contextualizedTranscript);
-
-    if (video) {
-      await prisma.transcript.create({
-        data: {
-          videoId: video.id,
-          type: "contextualized",
-          language: targetLanguage,
-          segments: contextualizedTranscript,
-        },
-      });
-
-      await prisma.video.update({
-        where: { id: video.id },
-        data: {
-          targetLanguage,
-          region,
-          status: "completed",
-        },
-      });
-
-      const processingTime = Date.now() - startTime;
-      await prisma.processingSession.create({
-        data: {
-          videoId: video.id,
-          targetLanguage,
-          region,
-          currencyConversions: changes.currencyConversions,
-          locationChanges: changes.locationChanges,
-          measurementConversions: changes.measurementConversions,
-          culturalAdaptations: changes.culturalAdaptations,
-          processingTimeMs: processingTime,
-          transcriptLength: transcript.length,
-          status: "completed",
-          completedAt: new Date(),
-        },
-      });
-
-      await prisma.analytics.create({
-        data: {
-          eventType: "video_processed",
-          videoId: video.id,
-          language: targetLanguage,
-          region,
-          metadata: {
-            processingTimeMs: processingTime,
-            changes,
-          },
-        },
-      });
-    }
-
-    return NextResponse.json({
-      contextualizedTranscript,
-      changes,
-      cached: false,
-    });
-  } catch (error) {
-    console.error("Contextualization error:", error);
-
-    await prisma.analytics.create({
-      data: {
-        eventType: "error",
-        metadata: {
-          error: error.message,
-          endpoint: "contextualize",
-        },
-      },
-    }).catch(console.error);
-
-    return NextResponse.json(
-      { error: error.message || "Failed to contextualize content" },
-      { status: 500 }
-    );
-  }
-}
-
-async function getChangesFromSession(videoId, language, region) {
-  const session = await prisma.processingSession.findFirst({
-    where: {
-      videoId,
-      targetLanguage: language,
-      region,
-      status: "completed",
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (session) {
-    return {
-      languageChange: `English → ${language}`,
-      currencyConversions: session.currencyConversions,
-      locationChanges: session.locationChanges,
-      measurementConversions: session.measurementConversions,
-      culturalAdaptations: session.culturalAdaptations,
-      examples: [],
-    };
-  }
-
-  return {
-    languageChange: `English → ${language}`,
-    currencyConversions: 0,
-    locationChanges: 0,
-    measurementConversions: 0,
-    culturalAdaptations: 0,
-    examples: [],
+  const reset = () => {
+    setStep("input");
+    setVideoData(null);
+    setPdfData(null);
   };
-}
-
-function detectChanges(original, contextualized) {
-  const changes = {
-    languageChange: "English → Target Language",
-    currencyConversions: 0,
-    locationChanges: 0,
-    measurementConversions: 0,
-    culturalAdaptations: 0,
-    examples: [],
+  const changeTab = (newTab) => {
+    setTab(newTab);
+    reset();
   };
 
-  const currencyPattern = /\$|dollar|cent|euro|pound|gbp/i;
-  const locationPattern = /store|walmart|target|mall|restaurant|library/i;
-  const measurementPattern = /fahrenheit|°f|mile|feet|foot|pound|lb/i;
+  return (
+    <main className="min-h-screen bg-background">
+      <header className="border-b-4 border-black sticky top-0 z-50 bg-white">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black text-foreground">
+                Context<span className="text-[#f582ae]">AI</span>
+              </h1>
+              <p className="text-sm text-muted-foreground font-bold mt-0.5">
+                Cultural Localization Platform
+              </p>
+            </div>
+            {step !== "input" && (
+              <button
+                onClick={reset}
+                className="px-5 py-2 text-sm font-bold border-3 border-black rounded-xl bg-white hover:bg-accent transition-colors shadow-cartoon-sm"
+              >
+                ← Back
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
 
-  for (let i = 0; i < Math.min(original.length, contextualized.length); i++) {
-    const origText = original[i].text.toLowerCase();
+      {step === "input" && (
+        <div className="container mx-auto px-6 py-12 max-w-4xl text-center">
+          <div className="flex justify-center mb-6">
+            <Sparkles className="w-12 h-12 text-[#f582ae] animate-float" />
+          </div>
+          
+          <h2 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
+            Transform Educational Content<br />
+            Into Your Language
+          </h2>
+          
+          <p className="text-lg text-muted-foreground font-bold max-w-2xl mx-auto">
+            AI-powered platform that translates English educational videos and PDFs into 
+            culturally-relevant Indian language versions with natural voice and localized examples.
+          </p>
+        </div>
+      )}
 
-    if (currencyPattern.test(origText)) {
-      changes.currencyConversions++;
-      if (changes.examples.length < 5) {
-        changes.examples.push(`Currency adapted to ₹`);
-      }
-    }
+      <div className="container mx-auto px-6 py-8">
+        <div className="flex gap-8 items-start">
+          {step === "input" && (
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => changeTab("video")}
+                className={`flex items-center justify-center gap-2 px-5 py-3 rounded-full font-bold transition-all border-3 border-black ${
+                  tab === "video"
+                    ? "bg-[#f582ae] text-white shadow-cartoon-sm"
+                    : "bg-white text-foreground hover:bg-[#f3d2c1]"
+                }`}
+              >
+                <Video className="w-5 h-5" />
+                <span>Video</span>
+              </button>
+              <button
+                onClick={() => changeTab("pdf")}
+                className={`flex items-center justify-center gap-2 px-5 py-3 rounded-full font-bold transition-all border-3 border-black ${
+                  tab === "pdf"
+                    ? "bg-[#8bd3dd] text-foreground shadow-cartoon-sm"
+                    : "bg-white text-foreground hover:bg-[#f3d2c1]"
+                }`}
+              >
+                <FileText className="w-5 h-5" />
+                <span>PDF</span>
+              </button>
+            </div>
+          )}
 
-    if (locationPattern.test(origText)) {
-      changes.locationChanges++;
-      if (changes.examples.length < 5) {
-        changes.examples.push(`Location adapted to Indian context`);
-      }
-    }
+          <div className="flex-1 flex justify-center">
+            <div className="w-full max-w-2xl">
+              {tab === "video" && (
+                <>
+                  {step === "input" && (
+                    <VideoInput onStartProcessing={() => setStep("processing")} />
+                  )}
+                  {step === "processing" && (
+                    <ProcessingView
+                      onComplete={(d) => {
+                        setVideoData(d);
+                        setStep("player");
+                      }}
+                    />
+                  )}
+                  {step === "player" && videoData && (
+                    <VideoPlayerView videoData={videoData} />
+                  )}
+                </>
+              )}
 
-    if (measurementPattern.test(origText)) {
-      changes.measurementConversions++;
-      if (changes.examples.length < 5) {
-        changes.examples.push(`Measurement converted to metric`);
-      }
-    }
-  }
+              {tab === "pdf" && (
+                <>
+                  {step === "input" && (
+                    <PDFInput onStartProcessing={() => setStep("processing")} />
+                  )}
+                  {step === "processing" && (
+                    <PDFProcessingView
+                      onComplete={(d) => {
+                        setPdfData(d);
+                        setStep("viewer");
+                      }}
+                    />
+                  )}
+                  {step === "viewer" && pdfData && <PDFViewer pdfData={pdfData} />}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
-  changes.culturalAdaptations =
-    changes.currencyConversions +
-    changes.locationChanges +
-    changes.measurementConversions;
-
-  return changes;
+      <footer className="border-t-4 border-black mt-16 py-6 bg-white">
+        <div className="container mx-auto px-6 text-center">
+          <p className="text-sm font-bold text-muted-foreground">
+            Built with Next.js, Tailwind CSS, Google Gemini AI & Cloud Text-to-Speech
+          </p>
+        </div>
+      </footer>
+    </main>
+  );
 }
 EOF
 
-# Fix app/api/extract-transcript/route.js
-cat > app/api/extract-transcript/route.js << 'EOF'
-import { NextResponse } from "next/server";
-import { YoutubeTranscript } from "youtube-transcript";
-import { prisma } from "../../../lib/prisma";
-
-export async function POST(request) {
-  try {
-    const { videoUrl } = await request.json();
-
-    const videoId = extractVideoId(videoUrl);
-
-    if (!videoId) {
-      return NextResponse.json(
-        { error: "Invalid YouTube URL" },
-        { status: 400 }
-      );
-    }
-
-    const existingVideo = await prisma.video.findUnique({
-      where: { videoId },
-      include: {
-        transcripts: {
-          where: { type: "original" },
-        },
-      },
-    });
-
-    if (existingVideo && existingVideo.transcripts.length > 0) {
-      return NextResponse.json({
-        videoId,
-        transcript: existingVideo.transcripts[0].segments,
-        cached: true,
-      });
-    }
-
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-
-    if (!transcript || transcript.length === 0) {
-      return NextResponse.json(
-        { error: "No transcript available for this video" },
-        { status: 404 }
-      );
-    }
-
-    const formattedTranscript = transcript.map((segment) => ({
-      text: segment.text,
-      start: segment.offset / 1000,
-      duration: segment.duration / 1000,
-    }));
-
-    const video = await prisma.video.upsert({
-      where: { videoId },
-      update: { updatedAt: new Date() },
-      create: {
-        videoId,
-        targetLanguage: "en",
-        region: "global",
-        status: "processing",
-      },
-    });
-
-    await prisma.transcript.create({
-      data: {
-        videoId: video.id,
-        type: "original",
-        language: "en",
-        segments: formattedTranscript,
-      },
-    });
-
-    await prisma.analytics.create({
-      data: {
-        eventType: "transcript_extracted",
-        videoId: video.id,
-        metadata: {
-          segmentCount: formattedTranscript.length,
-        },
-      },
-    });
-
-    return NextResponse.json({
-      videoId,
-      transcript: formattedTranscript,
-      cached: false,
-    });
-  } catch (error) {
-    console.error("Transcript extraction error:", error);
-
-    await prisma.analytics.create({
-      data: {
-        eventType: "error",
-        metadata: {
-          error: error.message,
-          endpoint: "extract-transcript",
-        },
-      },
-    }).catch(console.error);
-
-    return NextResponse.json(
-      { error: error.message || "Failed to extract transcript" },
-      { status: 500 }
-    );
-  }
-}
-
-function extractVideoId(url) {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-    /^([a-zA-Z0-9_-]{11})$/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-
-  return null;
-}
-EOF
-
-# Fix app/api/generate-audio/route.js
-cat > app/api/generate-audio/route.js << 'EOF'
-import { NextResponse } from "next/server";
-import { LANGUAGE_CODES, VOICE_MAP } from "../../../lib/constants";
-
-export async function POST(request) {
-  try {
-    const { transcript, language } = await request.json();
-
-    if (!transcript || !Array.isArray(transcript)) {
-      return NextResponse.json(
-        { error: "Invalid transcript format" },
-        { status: 400 }
-      );
-    }
-
-    const voiceName = VOICE_MAP[language] || "hi-IN-Wavenet-D";
-    const languageCode = LANGUAGE_CODES[language] || "hi-IN";
-
-    const audioSegments = await Promise.all(
-      transcript.map(async (segment) => {
-        try {
-          const audioData = await generateAudioForSegment(
-            segment.text,
-            voiceName,
-            languageCode
-          );
-
-          return {
-            text: segment.text,
-            start: segment.start,
-            duration: segment.duration,
-            audioBase64: audioData,
-          };
-        } catch (error) {
-          console.error("Error generating audio for segment:", error);
-          return {
-            text: segment.text,
-            start: segment.start,
-            duration: segment.duration,
-            audioBase64: null,
-          };
-        }
-      })
-    );
-
-    return NextResponse.json({
-      audioSegments,
-      voiceName,
-      languageCode,
-    });
-  } catch (error) {
-    console.error("Audio generation error:", error);
-    return NextResponse.json(
-      { error: error.message || "Failed to generate audio" },
-      { status: 500 }
-    );
-  }
-}
-
-async function generateAudioForSegment(text, voiceName, languageCode) {
-  const apiKey = process.env.GOOGLE_CLOUD_TTS_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Google Cloud TTS API key not configured");
-  }
-
-  const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
-
-  const requestBody = {
-    input: { text },
-    voice: {
-      languageCode,
-      name: voiceName,
-    },
-    audioConfig: {
-      audioEncoding: "MP3",
-      pitch: 0,
-      speakingRate: 0.95,
-    },
-  };
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(
-      `TTS API error: ${errorData.error?.message || "Unknown error"}`
-    );
-  }
-
-  const data = await response.json();
-  return data.audioContent;
-}
-EOF
-
-# Clean cache and restart
-rm -rf .next
-
-echo "✅ All @/ aliases removed!"
+echo "✅ Fixed layout!"
 echo "Run: npm run dev"

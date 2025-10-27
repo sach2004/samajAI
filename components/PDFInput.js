@@ -1,8 +1,8 @@
 "use client";
 
-import { FileText, Globe, Languages, Loader2, Upload } from "lucide-react";
+import { FileText, Globe, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
-import { SUPPORTED_LANGUAGES, WEBSITE_TRANSLATIONS } from "../lib/constants";
+import { SUPPORTED_LANGUAGES } from "../lib/constants";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -17,15 +17,11 @@ import {
 export default function PDFInput({ onStartProcessing }) {
   const [pdfFile, setPdfFile] = useState(null);
   const [language, setLanguage] = useState("hi");
-  const [websiteLang, setWebsiteLang] = useState("en");
   const [error, setError] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
 
-  const t = WEBSITE_TRANSLATIONS[websiteLang];
-
   useEffect(() => {
-    // Load PDF.js from CDN
     const script = document.createElement("script");
     script.src =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
@@ -33,7 +29,6 @@ export default function PDFInput({ onStartProcessing }) {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
         "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
       setPdfjsLoaded(true);
-      console.log("✅ PDF.js loaded");
     };
     document.body.appendChild(script);
   }, []);
@@ -74,38 +69,24 @@ export default function PDFInput({ onStartProcessing }) {
 
     try {
       const arrayBuffer = await pdfFile.arrayBuffer();
-
       const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
       const pdf = await loadingTask.promise;
 
-      console.log("📄 PDF loaded:", pdf.numPages, "pages");
-
       let fullText = "";
-
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items.map((item) => item.str).join(" ");
         fullText += pageText + "\n\n";
-
-        console.log(`📄 Extracted page ${i}/${pdf.numPages}`);
       }
 
       const text = fullText.trim();
 
       if (!text) {
-        setError("No text found in PDF. This might be an image-based PDF.");
+        setError("No text found in PDF");
         setExtracting(false);
         return;
       }
-
-      console.log(
-        "✅ Extracted:",
-        text.length,
-        "characters from",
-        pdf.numPages,
-        "pages"
-      );
 
       sessionStorage.setItem("pdfText", text);
       sessionStorage.setItem("pdfFileName", pdfFile.name);
@@ -115,45 +96,22 @@ export default function PDFInput({ onStartProcessing }) {
 
       onStartProcessing();
     } catch (err) {
-      console.error("PDF extraction error:", err);
       setError("Failed to extract PDF: " + err.message);
       setExtracting(false);
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto mt-12">
-      <Card className="p-8 shadow-xl border-2">
-        <div className="flex justify-end mb-4">
-          <Select value={websiteLang} onValueChange={setWebsiteLang}>
-            <SelectTrigger className="w-fit">
-              <Languages className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="hi">हिंदी (Hindi)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Transform Educational PDFs
-          </h2>
-          <p className="text-gray-600">
-            Upload English PDF → Get Contextualized PDF in Indian Languages
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <div>
+      <Card className="p-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <label className="text-sm font-bold text-foreground flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Upload PDF Document
             </label>
 
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-500 transition-colors">
+            <div className="border-3 border-dashed border-black rounded-xl p-8 text-center bg-white hover:bg-[#f3d2c1] transition-colors cursor-pointer">
               <input
                 type="file"
                 accept=".pdf"
@@ -168,30 +126,26 @@ export default function PDFInput({ onStartProcessing }) {
                   extracting ? "opacity-50" : ""
                 }`}
               >
-                {extracting ? (
-                  <Loader2 className="w-12 h-12 text-purple-600 mb-3 animate-spin" />
-                ) : (
-                  <Upload className="w-12 h-12 text-gray-400 mb-3" />
-                )}
+                <Upload className="w-12 h-12 text-[#f582ae] mb-3" />
                 {pdfFile ? (
                   <div>
-                    <p className="text-sm font-medium text-green-600">
+                    <p className="text-sm font-bold text-green-600">
                       ✓ {pdfFile.name}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1 font-bold">
                       {(pdfFile.size / 1024 / 1024).toFixed(2)} MB
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-sm font-medium text-gray-700">
+                    <p className="text-sm font-bold text-foreground">
                       {!pdfjsLoaded
-                        ? "Loading PDF library..."
+                        ? "Loading..."
                         : extracting
-                        ? "Extracting text..."
+                        ? "Extracting..."
                         : "Click to upload PDF"}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1 font-bold">
                       Max 10MB • Text-based PDFs only
                     </p>
                   </div>
@@ -201,7 +155,7 @@ export default function PDFInput({ onStartProcessing }) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <label className="text-sm font-bold text-foreground flex items-center gap-2">
               <Globe className="w-4 h-4" />
               Target Language
             </label>
@@ -227,32 +181,24 @@ export default function PDFInput({ onStartProcessing }) {
 
           <Button
             type="submit"
-            className="w-full text-lg py-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            className="w-full"
+            size="lg"
+            variant="secondary"
             disabled={!pdfFile || extracting || !pdfjsLoaded}
           >
-            {extracting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Extracting PDF...
-              </>
-            ) : (
-              "🚀 Contextualize PDF"
-            )}
+            {extracting ? "Processing..." : "🚀 Process PDF"}
           </Button>
         </form>
 
-        <div className="mt-8 p-4 bg-purple-50 rounded-lg">
-          <h3 className="font-semibold text-sm text-purple-900 mb-2">
-            How It Works:
+        <div className="mt-6 p-4 bg-[#f3d2c1] border-3 border-black rounded-xl">
+          <h3 className="font-black text-sm text-foreground mb-2">
+            What We Do:
           </h3>
-          <div className="space-y-1 text-xs text-purple-800">
-            <p>✓ Extract text from PDF (in your browser - 100% client-side)</p>
-            <p>
-              ✓ AI translates to{" "}
-              {SUPPORTED_LANGUAGES.find((l) => l.value === language)?.label}
-            </p>
-            <p>✓ Adapt cultural examples ($ → ₹, Store → Sabzi mandi)</p>
-            <p>✓ Generate new PDF with contextualized content</p>
+          <div className="space-y-1 text-xs text-muted-foreground font-bold">
+            <p>✓ Extract text from your PDF</p>
+            <p>✓ Translate to your chosen language</p>
+            <p>✓ Adapt cultural examples</p>
+            <p>✓ Generate downloadable document</p>
           </div>
         </div>
       </Card>
