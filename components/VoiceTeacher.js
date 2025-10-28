@@ -30,7 +30,6 @@ export default function VoiceTeacher({ videoData, onClose }) {
   const audioSourceRef = useRef(null);
 
   useEffect(() => {
-    // Initialize Web Speech API
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -71,7 +70,6 @@ export default function VoiceTeacher({ videoData, onClose }) {
       };
     }
 
-    // Initialize Audio Context for playback
     try {
       audioContextRef.current = new (window.AudioContext ||
         window.webkitAudioContext)();
@@ -79,7 +77,6 @@ export default function VoiceTeacher({ videoData, onClose }) {
       console.error("Audio context error:", e);
     }
 
-    // Welcome message - ONLY ADD ONCE
     const welcomeMsg = getWelcomeMessage(videoData.language);
     setConversation([
       { role: "teacher", content: welcomeMsg, timestamp: Date.now() },
@@ -147,7 +144,6 @@ export default function VoiceTeacher({ videoData, onClose }) {
     setError("");
 
     try {
-      // Call AI Teacher API
       const response = await fetch("/api/voice-teacher", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -158,7 +154,7 @@ export default function VoiceTeacher({ videoData, onClose }) {
             transcript: videoData.contextualizedTranscript,
             changes: videoData.changes,
           },
-          conversationHistory: conversation.slice(-6), // Last 3 exchanges
+          conversationHistory: conversation.slice(-6),
         }),
       });
 
@@ -168,7 +164,6 @@ export default function VoiceTeacher({ videoData, onClose }) {
 
       addMessage("teacher", data.answer, data.audioBase64);
 
-      // Auto-play response
       if (data.audioBase64) {
         await playAudio(data.audioBase64);
       }

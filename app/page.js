@@ -70,7 +70,6 @@ export default function Home() {
       )}
 
       <div className="container mx-auto px-6 py-8 flex justify-center relative">
-        {/* Changed from max-w-2xl to max-w-6xl for much wider content area */}
         <div
           className={`w-full ${
             step === "input" ? "max-w-2xl" : "max-w-6xl"

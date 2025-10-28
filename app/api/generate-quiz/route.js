@@ -17,7 +17,6 @@ export async function POST(request) {
 
     const languageName = LANGUAGE_NAMES[language] || "Hindi";
 
-    // Combine all transcript segments into full text
     const fullText = transcript.map((seg) => seg.text).join(" ");
 
     const prompt = `You are an expert educational content creator. Based on the following video transcript in ${languageName}, generate 5 multiple-choice quiz questions to test understanding.

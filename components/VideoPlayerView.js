@@ -265,9 +265,7 @@ export default function VideoPlayerView({ videoData }) {
       try {
         audioSourceRef.current.stop();
         audioSourceRef.current.disconnect();
-      } catch (e) {
-        // Already stopped
-      }
+      } catch (e) {}
       audioSourceRef.current = null;
       setIsAudioPlaying(false);
     }

@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { prisma } from "../../../lib/prisma";
+import { NextResponse } from "next/server";
 import { LANGUAGE_NAMES } from "../../../lib/constants";
+import { prisma } from "../../../lib/prisma";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -9,9 +9,9 @@ export async function POST(request) {
   const startTime = Date.now();
 
   try {
-    const { videoId, transcript, targetLanguage, region } = await request.json();
+    const { videoId, transcript, targetLanguage, region } =
+      await request.json();
 
-    // Check cache first
     try {
       const video = await prisma.video.findUnique({
         where: { videoId },
@@ -27,8 +27,12 @@ export async function POST(request) {
 
       if (video && video.transcripts.length > 0) {
         console.log("✅ Using cached contextualized transcript");
-        const changes = await getChangesFromSession(video.id, targetLanguage, region);
-        
+        const changes = await getChangesFromSession(
+          video.id,
+          targetLanguage,
+          region
+        );
+
         return NextResponse.json({
           contextualizedTranscript: video.transcripts[0].segments,
           changes,
@@ -36,7 +40,10 @@ export async function POST(request) {
         });
       }
     } catch (cacheError) {
-      console.log("⚠️ Cache check failed, proceeding with AI:", cacheError.message);
+      console.log(
+        "⚠️ Cache check failed, proceeding with AI:",
+        cacheError.message
+      );
     }
 
     const languageName = LANGUAGE_NAMES[targetLanguage] || "Hindi";
@@ -110,11 +117,14 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
       throw new Error("Invalid response format from AI");
     }
 
-    console.log("✅ Contextualization complete:", contextualizedTranscript.length, "segments");
+    console.log(
+      "✅ Contextualization complete:",
+      contextualizedTranscript.length,
+      "segments"
+    );
 
     const changes = detectChanges(transcript, contextualizedTranscript);
 
-    // Save to database
     try {
       const video = await prisma.video.findUnique({
         where: { videoId },
@@ -173,7 +183,6 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
       }
     } catch (dbError) {
       console.error("⚠️ Database save failed:", dbError.message);
-      // Continue anyway, transcript is ready
     }
 
     return NextResponse.json({
@@ -194,9 +203,7 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
           },
         },
       });
-    } catch (e) {
-      // Ignore
-    }
+    } catch (e) {}
 
     return NextResponse.json(
       { error: error.message || "Failed to contextualize content" },

@@ -7,20 +7,18 @@ export async function POST(request) {
 
     console.log("📄 Generating DOCX for language:", language);
 
-    // Create DOCX document
     const doc = new Document({
       sections: [
         {
           properties: {},
           children: [
-            // Title
             new Paragraph({
               text: "Contextualized Document",
               heading: HeadingLevel.HEADING_1,
               spacing: { after: 200 },
               alignment: "center",
             }),
-            // Subtitle
+
             new Paragraph({
               children: [
                 new TextRun({
@@ -32,12 +30,12 @@ export async function POST(request) {
               spacing: { after: 400 },
               alignment: "center",
             }),
-            // Divider
+
             new Paragraph({
               text: "",
               spacing: { after: 200 },
             }),
-            // Content - Split into paragraphs
+
             ...text.split("\n\n").map(
               (paragraph) =>
                 new Paragraph({
@@ -56,12 +54,10 @@ export async function POST(request) {
       ],
     });
 
-    // Generate DOCX buffer
     const buffer = await Packer.toBuffer(doc);
 
     console.log("✅ DOCX generated successfully");
 
-    // Return DOCX file
     return new NextResponse(buffer, {
       headers: {
         "Content-Type":

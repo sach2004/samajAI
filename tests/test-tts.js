@@ -1,6 +1,6 @@
 // test-tts.js
 async function testTTS() {
-  const apiKey = "AIzaSyC165dOjAIUx0nB8HTYARvTJkGBH3wdHFk"; // Replace with your actual key
+  const apiKey = ""; // Replace with your actual key
 
   const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
 
