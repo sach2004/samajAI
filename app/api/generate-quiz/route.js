@@ -45,8 +45,7 @@ OUTPUT FORMAT: Return ONLY a valid JSON array. No markdown, no code blocks, no e
     "correctAnswer": "A",
     "difficulty": "easy",
     "explanation": "Brief explanation in ${languageName} why this is correct"
-  },
-  ...
+  }
 ]
 
 CRITICAL: Start your response with [ and end with ]. No other text.`;
@@ -54,7 +53,7 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
     console.log("🧠 Generating quiz questions in", languageName);
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
       generationConfig: {
         temperature: 0.8,
         topK: 40,

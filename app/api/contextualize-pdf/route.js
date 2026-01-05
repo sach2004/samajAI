@@ -12,11 +12,11 @@ export async function POST(request) {
     console.log(`🤖 Contextualizing ${text.length} chars to ${languageName}`);
 
     const prompt = `Translate this English educational content to ${languageName} for ${region} students. Adapt cultural examples:
-- Currency: $ → ₹, dollars → rupees
-- Locations: Store → Sabzi mandi, Mall → Shopping complex, Restaurant → Dhaba
-- Food: Hamburger → Samosa, Pizza → Dosa, Apple → Mango
-- Names: John → Rahul, Sarah → Priya, Michael → Arjun
-- Measurements: °F → °C, miles → km, feet → meters
+- Currency: dollar to rupees
+- Locations: Store to Sabzi mandi, Mall to Shopping complex, Restaurant to Dhaba
+- Food: Hamburger to Samosa, Pizza to Dosa, Apple to Mango
+- Names: John to Rahul, Sarah to Priya, Michael to Arjun
+- Measurements: Fahrenheit to Celsius, miles to km, feet to meters
 
 Keep educational concepts identical, only change examples.
 
@@ -26,7 +26,7 @@ ${text}
 Return ONLY the translated text in ${languageName}.`;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
       generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
     });
 

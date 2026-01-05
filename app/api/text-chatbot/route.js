@@ -42,32 +42,23 @@ CULTURAL ADAPTATIONS MADE:
 - Measurement conversions: ${videoContext.changes.measurementConversions}
 ${conversationContext}
 
-STUDENT'S QUESTION (in ${languageName}):
+STUDENT QUESTION (in ${languageName}):
 "${question}"
 
 RESPONSE GUIDELINES:
-1. **Answer in ${languageName}** using natural, conversational language
-2. **Be concise but complete** - aim for 4-8 sentences
-3. **Use Indian examples and context**:
-   - Daily life: chai, cricket, trains, markets
-   - Education: schools, exams, notebooks
-   - Culture: festivals, food, family
-4. **Structure your answer clearly**:
-   - Start with direct answer
-   - Give explanation with examples
-   - Connect to the video content
-5. **Use simple formatting**:
-   - Break into paragraphs if needed
-   - Use bullet points for lists (•)
-   - Bold key terms sparingly
-6. **Be encouraging** - Students are learning!
+1. Answer in ${languageName} using natural, conversational language
+2. Be concise but complete - aim for 4-8 sentences
+3. Use Indian examples and context: Daily life like chai, cricket, trains, markets. Education like schools, exams, notebooks. Culture like festivals, food, family
+4. Structure your answer clearly: Start with direct answer, Give explanation with examples, Connect to the video content
+5. Use simple formatting: Break into paragraphs if needed, Use bullet points for lists, Bold key terms sparingly
+6. Be encouraging - Students are learning!
 
 IMPORTANT: Respond ONLY in ${languageName}. Make it easy to copy and save as notes.`;
 
     console.log("🤖 Calling Gemini for chatbot response...");
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
       generationConfig: {
         temperature: 0.7,
         topK: 40,
@@ -125,7 +116,7 @@ Return ONLY a JSON array of 3 questions, no other text:
 ["question1", "question2", "question3"]`;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
       generationConfig: {
         temperature: 0.8,
         maxOutputTokens: 300,

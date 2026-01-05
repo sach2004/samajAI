@@ -53,38 +53,32 @@ export async function POST(request) {
 TASK: Translate and recontextualize this English educational video transcript into ${languageName} for students in ${region}.
 
 CRITICAL RULES:
-1. **PRESERVE EXACT TIMESTAMPS**: Do NOT modify "start" or "duration" values AT ALL
-2. **Translate accurately** to ${languageName}
-3. **Recontextualize examples** to Indian context:
-   - Currency: $ → ₹, dollars → rupees, cents → paisa
-   - Locations: Store/Walmart → Sabzi mandi/Kirana store, Restaurant → Dhaba/Local eatery
-   - Food: Hamburger → Samosa/Vada pav, Apple pie → Gulab jamun, Pizza → Dosa, Apples → Mangoes
-   - Names: John → Rahul, Sarah → Priya, Michael → Arjun, Emma → Anjali
-   - Measurements: °F → °C, miles → km, feet → meters, pounds → kg
-   - Sports: Baseball → Cricket, American Football → Football/Cricket
-   - Holidays: Thanksgiving → Diwali, Christmas → Holi, Halloween → Navratri
-4. **Keep educational concept identical** - only change examples
-5. **Use natural, conversational language** appropriate for ${region} students
-6. **Regional considerations**:
-   - Urban regions: Modern shops, malls acceptable
-   - Rural regions: Weekly haats, local markets, village context
+1. PRESERVE EXACT TIMESTAMPS: Do NOT modify "start" or "duration" values AT ALL
+2. Translate accurately to ${languageName}
+3. Recontextualize examples to Indian context:
+   - Currency: dollar to rupees, cents to paisa
+   - Locations: Store/Walmart to Sabzi mandi/Kirana store, Restaurant to Dhaba/Local eatery
+   - Food: Hamburger to Samosa/Vada pav, Apple pie to Gulab jamun, Pizza to Dosa, Apples to Mangoes
+   - Names: John to Rahul, Sarah to Priya, Michael to Arjun, Emma to Anjali
+   - Measurements: Fahrenheit to Celsius, miles to km, feet to meters, pounds to kg
+   - Sports: Baseball to Cricket, American Football to Football/Cricket
+   - Holidays: Thanksgiving to Diwali, Christmas to Holi, Halloween to Navratri
+4. Keep educational concept identical - only change examples
+5. Use natural, conversational language appropriate for ${region} students
+6. Regional considerations: Urban regions - Modern shops, malls acceptable. Rural regions - Weekly haats, local markets, village context
 
 INPUT TRANSCRIPT:
 ${JSON.stringify(transcript, null, 2)}
 
 OUTPUT FORMAT: Return ONLY a valid JSON array. No markdown, no code blocks, no explanations.
-[{
-  "text": "translated and contextualized text in ${languageName}",
-  "start": <EXACT same number as input>,
-  "duration": <EXACT same number as input>
-}, ...]
+Format: [{"text": "translated text", "start": same_number, "duration": same_number}, ...]
 
 CRITICAL: Start your response with [ and end with ]. No other text.`;
 
     console.log("🤖 Calling Gemini AI for contextualization...");
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
       generationConfig: {
         temperature: 0.7,
         topK: 40,

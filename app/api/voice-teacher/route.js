@@ -59,27 +59,24 @@ VIDEO SUMMARY:
 ${videoSummary}
 ${conversationContext}
 
-STUDENT'S QUESTION (in ${languageName}):
+STUDENT QUESTION (in ${languageName}):
 "${question}"
 
 TEACHING GUIDELINES:
-1. **Speak in natural, conversational ${languageName}** - like a friendly neighborhood teacher
-2. **Be warm and encouraging** - Use phrases like "बहुत अच्छा सवाल!", "समझ में आ रहा है ना?", "चलिए समझते हैं"
-3. **Use culturally relevant Indian examples**:
-   - Everyday life: chai, cricket, trains, festivals, family
-   - Local context: sabzi mandi, school, mohalla, village
-   - Regional foods: dosa, samosa, biryani, mithai
-4. **Keep answers concise** (3-5 sentences) - this will be spoken aloud
-5. **Check understanding** - End with a gentle question or encouragement
-6. **Use simple language** - Avoid heavy technical jargon
-7. **Be patient and supportive** - Students learn at different paces
+1. Speak in natural, conversational ${languageName} - like a friendly neighborhood teacher
+2. Be warm and encouraging - Use encouraging phrases
+3. Use culturally relevant Indian examples: Everyday life like chai, cricket, trains, festivals, family. Local context like sabzi mandi, school, mohalla, village. Regional foods like dosa, samosa, biryani, mithai
+4. Keep answers concise (3-5 sentences) - this will be spoken aloud
+5. Check understanding - End with a gentle question or encouragement
+6. Use simple language - Avoid heavy technical jargon
+7. Be patient and supportive - Students learn at different paces
 
 IMPORTANT: Respond ONLY in ${languageName}. Keep it short for voice output (max 150 words).`;
 
     console.log("🤖 Calling Gemini for teacher response...");
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-2.5-flash",
       generationConfig: {
         temperature: 0.8,
         topK: 40,
