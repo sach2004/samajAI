@@ -1,19 +1,30 @@
 "use client";
 
-import { FileText, Sparkles, Video } from "lucide-react";
+import { FileText, Globe, Sparkles, Video } from "lucide-react";
 import { useState } from "react";
 import PDFInput from "../components/PDFInput";
 import PDFProcessingView from "../components/PDFProcessingView";
 import PDFViewer from "../components/PDFViewer";
 import ProcessingView from "../components/ProcessingView";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import VideoInput from "../components/VideoInput";
 import VideoPlayerView from "../components/VideoPlayerView";
+import { WEBSITE_TRANSLATIONS } from "../lib/constants";
 
 export default function Home() {
   const [tab, setTab] = useState("video");
   const [step, setStep] = useState("input");
   const [videoData, setVideoData] = useState(null);
   const [pdfData, setPdfData] = useState(null);
+  const [websiteLang, setWebsiteLang] = useState("en");
+
+  const t = WEBSITE_TRANSLATIONS[websiteLang];
 
   const reset = () => {
     setStep("input");
@@ -25,27 +36,63 @@ export default function Home() {
     reset();
   };
 
+  const languageOptions = [
+    { value: "en", label: "English", flag: "🇬🇧" },
+    { value: "hi", label: "हिंदी", flag: "🇮🇳" },
+    { value: "ta", label: "தமிழ்", flag: "🇮🇳" },
+    { value: "te", label: "తెలుగు", flag: "🇮🇳" },
+    { value: "kn", label: "ಕನ್ನಡ", flag: "🇮🇳" },
+    { value: "ml", label: "മലയാളം", flag: "🇮🇳" },
+    { value: "bn", label: "বাংলা", flag: "🇮🇳" },
+    { value: "mr", label: "मराठी", flag: "🇮🇳" },
+    { value: "gu", label: "ગુજરાતી", flag: "🇮🇳" },
+  ];
+
   return (
     <main className="min-h-screen bg-background relative overflow-hidden">
       <header className="border-b-4 border-black sticky top-0 z-50 bg-white">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
+            {/* LEFT - Logo and Tagline */}
             <div>
               <h1 className="text-3xl font-black text-foreground">
                 Context<span className="text-[#f582ae]">AI</span>
               </h1>
               <p className="text-sm text-muted-foreground font-bold mt-0.5">
-                Cultural Localization Platform
+                {t.tagline}
               </p>
             </div>
-            {step !== "input" && (
-              <button
-                onClick={reset}
-                className="px-5 py-2 text-sm font-bold border-3 border-black rounded-xl bg-white hover:bg-accent transition-colors shadow-cartoon-sm"
-              >
-                ← Back
-              </button>
-            )}
+
+            {/* RIGHT - Language Selector and Back Button */}
+            <div className="flex items-center gap-4">
+              {step !== "input" && (
+                <button
+                  onClick={reset}
+                  className="px-5 py-2 text-sm font-bold border-3 border-black rounded-xl bg-white hover:bg-accent transition-colors shadow-cartoon-sm"
+                >
+                  ← {t.newVideo}
+                </button>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-muted-foreground" />
+                <Select value={websiteLang} onValueChange={setWebsiteLang}>
+                  <SelectTrigger className="w-[140px] h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languageOptions.map((lang) => (
+                      <SelectItem key={lang.value} value={lang.value}>
+                        <span className="flex items-center gap-2">
+                          <span>{lang.flag}</span>
+                          <span>{lang.label}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -56,15 +103,11 @@ export default function Home() {
           <Sparkles className="w-16 h-16 text-[#8bd3dd] animate-float-slow absolute bottom-1/4 right-0 transform translate-x-1/2 translate-y-1/2" />
 
           <h2 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
-            Transform Educational Content
-            <br />
-            Into Your Language
+            {t.transformTitle}
           </h2>
 
           <p className="text-lg text-muted-foreground font-bold max-w-2xl mx-auto">
-            AI-powered platform that translates English educational videos and
-            PDFs into culturally-relevant Indian language versions with natural
-            voice and localized examples.
+            {t.transformDesc}
           </p>
         </div>
       )}
@@ -111,7 +154,10 @@ export default function Home() {
             {tab === "video" && (
               <>
                 {step === "input" && (
-                  <VideoInput onStartProcessing={() => setStep("processing")} />
+                  <VideoInput
+                    onStartProcessing={() => setStep("processing")}
+                    websiteLang={websiteLang}
+                  />
                 )}
                 {step === "processing" && (
                   <ProcessingView
@@ -129,7 +175,10 @@ export default function Home() {
             {tab === "pdf" && (
               <>
                 {step === "input" && (
-                  <PDFInput onStartProcessing={() => setStep("processing")} />
+                  <PDFInput
+                    onStartProcessing={() => setStep("processing")}
+                    websiteLang={websiteLang}
+                  />
                 )}
                 {step === "processing" && (
                   <PDFProcessingView

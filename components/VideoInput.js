@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, Languages, Mic2, Youtube } from "lucide-react";
+import { Globe, Mic2, Youtube } from "lucide-react";
 import { useState } from "react";
 import {
   SUPPORTED_LANGUAGES,
@@ -19,12 +19,11 @@ import {
   SelectValue,
 } from "./ui/select";
 
-export default function VideoInput({ onStartProcessing }) {
+export default function VideoInput({ onStartProcessing, websiteLang = "en" }) {
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [language, setLanguage] = useState("hi");
   const [region, setRegion] = useState("urban-delhi");
   const [voiceGender, setVoiceGender] = useState("female");
-  const [websiteLang, setWebsiteLang] = useState("en");
   const [error, setError] = useState("");
 
   const t = WEBSITE_TRANSLATIONS[websiteLang];
@@ -61,23 +60,23 @@ export default function VideoInput({ onStartProcessing }) {
           <div className="space-y-2">
             <label className="text-sm font-bold text-foreground flex items-center gap-2">
               <Youtube className="w-4 h-4" />
-              YouTube Video URL
+              {t.urlLabel}
             </label>
             <Input
               type="text"
-              placeholder="https://www.youtube.com/watch?v=..."
+              placeholder={t.urlPlaceholder}
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
             />
             <p className="text-xs text-muted-foreground font-bold">
-              Enter any educational YouTube video with English captions
+              {t.urlHint}
             </p>
           </div>
 
           <div className="space-y-2">
             <label className="text-sm font-bold text-foreground flex items-center gap-2">
               <Globe className="w-4 h-4" />
-              Target Language
+              {t.targetLangLabel}
             </label>
             <Select value={language} onValueChange={setLanguage}>
               <SelectTrigger>
@@ -96,7 +95,7 @@ export default function VideoInput({ onStartProcessing }) {
           <div className="space-y-2">
             <label className="text-sm font-bold text-foreground flex items-center gap-2">
               <Mic2 className="w-4 h-4" />
-              Voice Gender
+              {t.voiceLabel}
             </label>
             <Select value={voiceGender} onValueChange={setVoiceGender}>
               <SelectTrigger>
@@ -119,7 +118,7 @@ export default function VideoInput({ onStartProcessing }) {
           )}
 
           <Button type="submit" className="w-full" size="lg" variant="default">
-            🚀 Process Video
+            {t.submitButton}
           </Button>
         </form>
 

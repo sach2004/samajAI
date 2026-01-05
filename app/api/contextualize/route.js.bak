@@ -84,7 +84,7 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
     console.log("🤖 Calling Gemini AI for contextualization...");
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-1.5-flash",
       generationConfig: {
         temperature: 0.7,
         topK: 40,

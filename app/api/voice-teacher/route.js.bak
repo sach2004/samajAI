@@ -79,7 +79,7 @@ IMPORTANT: Respond ONLY in ${languageName}. Keep it short for voice output (max 
     console.log("🤖 Calling Gemini for teacher response...");
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-1.5-flash",
       generationConfig: {
         temperature: 0.8,
         topK: 40,

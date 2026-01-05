@@ -2,7 +2,7 @@
 
 import { FileText, Globe, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
-import { SUPPORTED_LANGUAGES } from "../lib/constants";
+import { SUPPORTED_LANGUAGES, WEBSITE_TRANSLATIONS } from "../lib/constants";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -14,12 +14,14 @@ import {
   SelectValue,
 } from "./ui/select";
 
-export default function PDFInput({ onStartProcessing }) {
+export default function PDFInput({ onStartProcessing, websiteLang = "en" }) {
   const [pdfFile, setPdfFile] = useState(null);
   const [language, setLanguage] = useState("hi");
   const [error, setError] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [pdfjsLoaded, setPdfjsLoaded] = useState(false);
+
+  const t = WEBSITE_TRANSLATIONS[websiteLang];
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -157,7 +159,7 @@ export default function PDFInput({ onStartProcessing }) {
           <div className="space-y-2">
             <label className="text-sm font-bold text-foreground flex items-center gap-2">
               <Globe className="w-4 h-4" />
-              Target Language
+              {t.targetLangLabel}
             </label>
             <Select value={language} onValueChange={setLanguage}>
               <SelectTrigger>
@@ -186,7 +188,7 @@ export default function PDFInput({ onStartProcessing }) {
             variant="secondary"
             disabled={!pdfFile || extracting || !pdfjsLoaded}
           >
-            {extracting ? "Processing..." : "🚀 Process PDF"}
+            {extracting ? "Processing..." : t.submitButton}
           </Button>
         </form>
 
