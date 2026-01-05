@@ -49,7 +49,7 @@ export default function Home() {
   ];
 
   return (
-    <main className="min-h-screen bg-background relative overflow-hidden">
+    <main className="min-h-screen bg-background relative overflow-hidden flex flex-col">
       <header className="border-b-4 border-black sticky top-0 z-50 bg-white">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -112,7 +112,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="container mx-auto px-6 py-8 flex justify-center relative">
+      <div className="container mx-auto px-6 py-8 flex justify-center relative flex-1">
         <div
           className={`w-full ${
             step === "input" ? "max-w-2xl" : "max-w-6xl"
@@ -197,7 +197,7 @@ export default function Home() {
         </div>
       </div>
 
-      <footer className="border-t-4 border-black mt-16 py-6 bg-white">
+      <footer className="border-t-4 border-black py-6 bg-white mt-auto">
         <div className="container mx-auto px-6 text-center">
           <p className="text-sm font-bold text-muted-foreground">
             Built with Next.js, Tailwind CSS, Google Gemini AI & Cloud

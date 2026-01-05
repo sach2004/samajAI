@@ -188,7 +188,7 @@ export default function PDFInput({ onStartProcessing, websiteLang = "en" }) {
             variant="secondary"
             disabled={!pdfFile || extracting || !pdfjsLoaded}
           >
-            {extracting ? "Processing..." : t.submitButton}
+            {extracting ? "Processing..." : "🚀 Summarize PDF"}
           </Button>
         </form>
 

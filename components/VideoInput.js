@@ -118,7 +118,7 @@ export default function VideoInput({ onStartProcessing, websiteLang = "en" }) {
           )}
 
           <Button type="submit" className="w-full" size="lg" variant="default">
-            {t.submitButton}
+            🚀 Contextualize Video
           </Button>
         </form>
 
