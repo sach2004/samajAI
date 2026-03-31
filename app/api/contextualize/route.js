@@ -48,7 +48,33 @@ export async function POST(request) {
 
     const languageName = LANGUAGE_NAMES[targetLanguage] || "Hindi";
 
-    const prompt = `You are an expert educational content localizer specializing in Indian cultural contextualization.
+    // Process in smaller chunks to avoid truncation
+    const chunkSize = 20; // Process 20 segments at a time
+    const chunks = [];
+    for (let i = 0; i < transcript.length; i += chunkSize) {
+      chunks.push(transcript.slice(i, i + chunkSize));
+    }
+
+    console.log(`🔄 Processing ${chunks.length} chunks...`);
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 8192,
+      },
+    });
+
+    let contextualizedTranscript = [];
+
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      const chunk = chunks[chunkIndex];
+
+      console.log(`📝 Processing chunk ${chunkIndex + 1}/${chunks.length}...`);
+
+      const prompt = `You are an expert educational content localizer specializing in Indian cultural contextualization.
 
 TASK: Translate and recontextualize this English educational video transcript into ${languageName} for students in ${region}.
 
@@ -68,47 +94,106 @@ CRITICAL RULES:
 6. Regional considerations: Urban regions - Modern shops, malls acceptable. Rural regions - Weekly haats, local markets, village context
 
 INPUT TRANSCRIPT:
-${JSON.stringify(transcript, null, 2)}
+${JSON.stringify(chunk, null, 2)}
 
-OUTPUT FORMAT: Return ONLY a valid JSON array. No markdown, no code blocks, no explanations.
+OUTPUT FORMAT: Return ONLY a valid JSON array. No markdown, no code blocks, no explanations, no extra text.
 Format: [{"text": "translated text", "start": same_number, "duration": same_number}, ...]
 
-CRITICAL: Start your response with [ and end with ]. No other text.`;
+CRITICAL: Your response must start with [ and end with ]. Include nothing else - no text before or after the JSON array.`;
 
-    console.log("🤖 Calling Gemini AI for contextualization...");
+      let retries = 3;
+      let success = false;
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      },
-    });
+      while (retries > 0 && !success) {
+        try {
+          const result = await model.generateContent(prompt);
+          const response = await result.response;
+          const responseText = response.text();
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const responseText = response.text();
+          console.log(`📦 Response length: ${responseText.length} chars`);
 
-    console.log("📝 Received Gemini response");
+          // Clean the response more aggressively
+          let jsonText = responseText.trim();
 
-    let contextualizedTranscript;
-    try {
-      const jsonText = responseText
-        .replace(/```json\n?/g, "")
-        .replace(/```\n?/g, "")
-        .trim();
+          // Remove markdown code blocks
+          jsonText = jsonText.replace(/```json\s*/g, "").replace(/```\s*/g, "");
 
-      contextualizedTranscript = JSON.parse(jsonText);
-    } catch (parseError) {
-      console.error("❌ JSON parse error:", parseError);
-      console.error("Response text:", responseText.substring(0, 500));
-      throw new Error("Failed to parse AI response. Please try again.");
+          // Remove any text before the first [
+          const firstBracket = jsonText.indexOf("[");
+          if (firstBracket > 0) {
+            jsonText = jsonText.substring(firstBracket);
+          }
+
+          // Remove any text after the last ]
+          const lastBracket = jsonText.lastIndexOf("]");
+          if (lastBracket > 0 && lastBracket < jsonText.length - 1) {
+            jsonText = jsonText.substring(0, lastBracket + 1);
+          }
+
+          // Try to fix common JSON issues
+          jsonText = jsonText
+            .replace(/,(\s*[}\]])/g, "$1") // Remove trailing commas
+            .replace(/\n/g, " ") // Remove newlines
+            .replace(/\s+/g, " ") // Normalize whitespace
+            .trim();
+
+          // Validate it starts and ends correctly
+          if (!jsonText.startsWith("[") || !jsonText.endsWith("]")) {
+            throw new Error("Response does not start with [ or end with ]");
+          }
+
+          const chunkResult = JSON.parse(jsonText);
+
+          if (!Array.isArray(chunkResult)) {
+            throw new Error("Response is not an array");
+          }
+
+          // Validate each segment has required fields
+          for (const seg of chunkResult) {
+            if (
+              !seg.text ||
+              seg.start === undefined ||
+              seg.duration === undefined
+            ) {
+              throw new Error("Segment missing required fields");
+            }
+          }
+
+          contextualizedTranscript =
+            contextualizedTranscript.concat(chunkResult);
+          console.log(
+            `✅ Chunk ${chunkIndex + 1} processed: ${
+              chunkResult.length
+            } segments`
+          );
+          success = true;
+        } catch (parseError) {
+          retries--;
+          console.error(
+            `❌ Chunk ${chunkIndex + 1} parse error (${retries} retries left):`,
+            parseError.message
+          );
+
+          if (retries === 0) {
+            // If all retries failed, try a fallback: keep original text but mark as translated
+            console.warn(`⚠️ Using fallback for chunk ${chunkIndex + 1}`);
+            const fallbackResult = chunk.map((seg) => ({
+              text: `[Translation failed] ${seg.text}`,
+              start: seg.start,
+              duration: seg.duration,
+            }));
+            contextualizedTranscript =
+              contextualizedTranscript.concat(fallbackResult);
+          } else {
+            // Wait before retrying
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        }
+      }
     }
 
-    if (!Array.isArray(contextualizedTranscript)) {
-      throw new Error("Invalid response format from AI");
+    if (contextualizedTranscript.length === 0) {
+      throw new Error("No segments were successfully processed");
     }
 
     console.log(

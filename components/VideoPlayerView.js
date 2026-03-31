@@ -51,6 +51,9 @@ export default function VideoPlayerView({ videoData }) {
   const gainNodeRef = useRef(null);
   const audioStartTimeRef = useRef(0);
   const audioStartOffsetRef = useRef(0);
+  const audioSegmentsRef = useRef([]); // Store segments for timestamp mapping
+  const isAudioPausedRef = useRef(false); // Track if audio is paused
+  const lastKnownVideoTimeRef = useRef(0); // Track video position continuously
 
   useEffect(() => {
     console.log("🎬 VideoPlayerView mounted");
@@ -93,6 +96,18 @@ export default function VideoPlayerView({ videoData }) {
     };
   }, []);
 
+  // Poll video position continuously while playing
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      if (player && isPlaying) {
+        const currentTime = player.getCurrentTime();
+        lastKnownVideoTimeRef.current = currentTime;
+      }
+    }, 100);
+
+    return () => clearInterval(pollInterval);
+  }, [player, isPlaying]);
+
   const onPlayerReady = (event) => {
     console.log("✅ YouTube player ready");
     event.target.mute();
@@ -100,11 +115,34 @@ export default function VideoPlayerView({ videoData }) {
   };
 
   const onPlayerStateChange = (event) => {
+    // YouTube player states:
+    // -1: unstarted, 0: ended, 1: playing, 2: paused, 3: buffering, 5: video cued
+
     if (event.data === 1) {
+      // Video started playing
       setIsPlaying(true);
+
+      // Resume audio if it was paused (resume from where we left off)
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+        isAudioPausedRef.current = false;
+        setIsAudioPlaying(true);
+        return;
+      }
+
       const attemptAudioPlay = () => {
         if (concatenatedBufferRef.current) {
-          playAudioFromTime(0);
+          // Stop any existing audio FIRST
+          stopAudio();
+
+          // Use the last known video position (continuously tracked via polling)
+          const videoTime = lastKnownVideoTimeRef.current;
+
+          // Map video time to concatenated buffer time
+          const concatenatedTime = getConcatenatedTime(videoTime);
+
+          console.log(`🎬 Video time: ${videoTime.toFixed(2)}s → Audio time: ${concatenatedTime.toFixed(2)}s`);
+          playAudioFromConcatenatedTime(concatenatedTime);
         } else {
           console.warn("⚠️ Audio not ready, retrying...");
           setTimeout(attemptAudioPlay, 500);
@@ -112,12 +150,114 @@ export default function VideoPlayerView({ videoData }) {
       };
       attemptAudioPlay();
     } else if (event.data === 2) {
+      // Video paused
       setIsPlaying(false);
-      stopAudio();
+      pauseAudio();
     } else if (event.data === 0) {
+      // Video ended
       setIsPlaying(false);
       setVideoEnded(true);
       stopAudio();
+    }
+  };
+
+  // Map YouTube video time to concatenated buffer time
+  const getConcatenatedTime = (videoTime) => {
+    const segments = audioSegmentsRef.current;
+    if (!segments || segments.length === 0) {
+      console.log(`⚠️ No segments available, returning videoTime ${videoTime.toFixed(2)}s`);
+      return videoTime;
+    }
+
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      const segEnd = seg.originalStart + seg.buffer.duration;
+      if (videoTime >= seg.originalStart && videoTime < segEnd) {
+        const result = seg.newStart + (videoTime - seg.originalStart);
+        return result;
+      }
+    }
+
+    // If video time is beyond all segments, return the end
+    const lastSeg = segments[segments.length - 1];
+    if (lastSeg && videoTime >= lastSeg.originalStart + lastSeg.buffer.duration) {
+      return lastSeg.newStart + lastSeg.buffer.duration;
+    }
+
+    // If before first segment, return early
+    if (segments[0] && videoTime < segments[0].originalStart) {
+      return Math.max(0, segments[0].newStart - (segments[0].originalStart - videoTime));
+    }
+
+    return videoTime;
+  };
+
+  const pauseAudio = () => {
+    isAudioPausedRef.current = true;
+    if (audioContextRef.current && audioContextRef.current.state === 'running') {
+      audioContextRef.current.suspend();
+    }
+    setIsAudioPlaying(false);
+  };
+
+  const resumeAudio = () => {
+    isAudioPausedRef.current = false;
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+      setIsAudioPlaying(true);
+    }
+  };
+
+  // Play audio from a specific time in the CONCATENATED buffer
+  const playAudioFromConcatenatedTime = async (startOffset) => {
+    if (
+      !audioContextRef.current ||
+      !concatenatedBufferRef.current ||
+      !gainNodeRef.current
+    ) {
+      console.error("❌ Audio not ready");
+      return;
+    }
+
+    // ALWAYS stop existing audio first
+    stopAudio();
+
+    const audioContext = audioContextRef.current;
+
+    if (audioContext.state === "suspended") {
+      await audioContext.resume();
+    }
+
+    try {
+      const source = audioContext.createBufferSource();
+      source.buffer = concatenatedBufferRef.current;
+      source.connect(gainNodeRef.current);
+
+      const duration = concatenatedBufferRef.current.duration - startOffset;
+      if (duration <= 0) return;
+
+      source.start(0, startOffset, duration);
+      audioSourceRef.current = source;
+
+      audioStartTimeRef.current = audioContext.currentTime;
+      audioStartOffsetRef.current = startOffset;
+      isAudioPausedRef.current = false;
+
+      setIsAudioPlaying(true);
+
+      console.log(`▶️ Playing audio from concatenated buffer at ${startOffset.toFixed(2)}s`);
+
+      source.onended = () => {
+        if (audioSourceRef.current === source) {
+          audioSourceRef.current = null;
+          if (!isAudioPausedRef.current) {
+            setIsAudioPlaying(false);
+          }
+        }
+      };
+    } catch (error) {
+      console.error("❌ Playback error:", error);
+      setAudioError("Playback failed: " + error.message);
     }
   };
 
@@ -167,6 +307,9 @@ export default function VideoPlayerView({ videoData }) {
         totalDuration += seg.buffer.duration + gap;
       });
 
+      // Store segments in ref AFTER newStart is calculated
+      audioSegmentsRef.current = audioSegments;
+
       const sampleRate = audioContext.sampleRate;
       const channels = audioSegments[0].buffer.numberOfChannels;
       const totalSamples = Math.ceil(totalDuration * sampleRate);
@@ -214,59 +357,20 @@ export default function VideoPlayerView({ videoData }) {
     }
   };
 
-  const playAudioFromTime = async (startOffset) => {
-    if (
-      !audioContextRef.current ||
-      !concatenatedBufferRef.current ||
-      !gainNodeRef.current
-    ) {
-      console.error("❌ Audio not ready");
-      return;
-    }
-
-    stopAudio();
-
-    const audioContext = audioContextRef.current;
-
-    if (audioContext.state === "suspended") {
-      await audioContext.resume();
-    }
-
-    try {
-      const source = audioContext.createBufferSource();
-      source.buffer = concatenatedBufferRef.current;
-      source.connect(gainNodeRef.current);
-
-      const duration = concatenatedBufferRef.current.duration - startOffset;
-      if (duration <= 0) return;
-
-      source.start(0, startOffset, duration);
-      audioSourceRef.current = source;
-
-      audioStartTimeRef.current = audioContext.currentTime;
-      audioStartOffsetRef.current = startOffset;
-
-      setIsAudioPlaying(true);
-
-      console.log(`▶️ Playing audio from ${startOffset.toFixed(2)}s`);
-
-      source.onended = () => {
-        audioSourceRef.current = null;
-        setIsAudioPlaying(false);
-      };
-    } catch (error) {
-      console.error("❌ Playback error:", error);
-      setAudioError("Playback failed: " + error.message);
-    }
-  };
-
   const stopAudio = () => {
     if (audioSourceRef.current) {
       try {
+        audioSourceRef.current.onended = null; // Prevent callback
         audioSourceRef.current.stop();
+      } catch (e) {
+        // Ignore errors from already stopped sources
+      }
+      try {
         audioSourceRef.current.disconnect();
       } catch (e) {}
       audioSourceRef.current = null;
+    }
+    if (!isAudioPausedRef.current) {
       setIsAudioPlaying(false);
     }
   };
@@ -295,17 +399,21 @@ export default function VideoPlayerView({ videoData }) {
     if (!player) return;
     if (isPlaying) {
       player.pauseVideo();
+      pauseAudio();
     } else {
       player.playVideo();
+      resumeAudio();
     }
   };
 
   const restartVideo = () => {
     if (!player) return;
     stopAudio();
+    lastKnownVideoTimeRef.current = 0; // Reset to beginning
     setVideoEnded(false);
     player.seekTo(0);
     player.playVideo();
+    // Audio will start automatically via onPlayerStateChange
   };
 
   const downloadSubtitles = () => {
