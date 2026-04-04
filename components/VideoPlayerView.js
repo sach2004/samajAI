@@ -548,7 +548,8 @@ export default function VideoPlayerView({ videoData }) {
               Restart
             </Button>
 
-            <Button
+            {/* [TEMPORARILY HIDDEN] Talk to Teacher button - uncomment when ready */}
+            {/* <Button
               onClick={() => setShowVoiceTeacher(true)}
               variant="secondary"
               size="lg"
@@ -556,9 +557,10 @@ export default function VideoPlayerView({ videoData }) {
             >
               <Mic className="w-5 h-5 mr-2" />
               🎤 Talk to Teacher
-            </Button>
+            </Button> */}
 
-            <Button
+            {/* [TEMPORARILY HIDDEN] Ask Questions button - uncomment when ready */}
+            {/* <Button
               onClick={() => {
                 setShowChatbot(true);
                 setChatbotMinimized(false);
@@ -569,7 +571,7 @@ export default function VideoPlayerView({ videoData }) {
             >
               <MessageCircle className="w-5 h-5 mr-2" />
               💬 Ask Questions
-            </Button>
+            </Button> */}
 
             {videoEnded && (
               <Button

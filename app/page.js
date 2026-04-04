@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, Globe, Sparkles, Video } from "lucide-react";
+import { Globe, Sparkles, Video } from "lucide-react";
+import { FileText, GraduationCap, BookOpen } from "lucide-react";
 import { useState } from "react";
 import PDFInput from "../components/PDFInput";
 import PDFProcessingView from "../components/PDFProcessingView";
@@ -56,7 +57,7 @@ export default function Home() {
             {/* LEFT - Logo and Tagline */}
             <div>
               <h1 className="text-3xl font-black text-foreground">
-                Context<span className="text-[#f582ae]">AI</span>
+                Samaj<span className="text-[#f582ae]">AI</span>
               </h1>
               <p className="text-sm text-muted-foreground font-bold mt-0.5">
                 {t.tagline}
@@ -146,6 +147,28 @@ export default function Home() {
                   <FileText className="w-5 h-5" />
                   <span>PDF</span>
                 </button>
+                <button
+                  onClick={() => changeTab("teacher")}
+                  className={`flex items-center justify-center gap-2 px-5 py-3 rounded-full font-bold transition-all ${
+                    tab === "teacher"
+                      ? "bg-[#8bd3dd] text-foreground"
+                      : "text-foreground hover:bg-[#f3d2c1]"
+                  }`}
+                >
+                  <GraduationCap className="w-5 h-5" />
+                  <span>Teacher</span>
+                </button>
+                <button
+                  onClick={() => changeTab("resources")}
+                  className={`flex items-center justify-center gap-2 px-5 py-3 rounded-full font-bold transition-all ${
+                    tab === "resources"
+                      ? "bg-[#8bd3dd] text-foreground"
+                      : "text-foreground hover:bg-[#f3d2c1]"
+                  }`}
+                >
+                  <BookOpen className="w-5 h-5" />
+                  <span>Resources</span>
+                </button>
               </div>
             </div>
           )}
@@ -192,6 +215,20 @@ export default function Home() {
                   <PDFViewer pdfData={pdfData} />
                 )}
               </>
+            )}
+            {tab === "teacher" && (
+              <div className="text-center py-20">
+                <GraduationCap className="w-16 h-16 mx-auto text-[#8bd3dd] mb-4" />
+                <h3 className="text-2xl font-bold">Talk to Teacher</h3>
+                <p className="text-muted-foreground mt-2">Chat with an AI teacher coming soon!</p>
+              </div>
+            )}
+            {tab === "resources" && (
+              <div className="text-center py-20">
+                <BookOpen className="w-16 h-16 mx-auto text-[#8bd3dd] mb-4" />
+                <h3 className="text-2xl font-bold">Resources</h3>
+                <p className="text-muted-foreground mt-2">Study resources coming soon!</p>
+              </div>
             )}
           </div>
         </div>
