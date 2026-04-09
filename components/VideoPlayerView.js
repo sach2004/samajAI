@@ -346,8 +346,7 @@ export default function VideoPlayerView({ videoData }) {
       }));
 
       console.log(
-        `✅ Audio ready: ${totalDuration.toFixed(2)}s, ${
-          audioSegments.length
+        `✅ Audio ready: ${totalDuration.toFixed(2)}s, ${audioSegments.length
         } segments`
       );
       setAudioLoaded(true);
@@ -367,7 +366,7 @@ export default function VideoPlayerView({ videoData }) {
       }
       try {
         audioSourceRef.current.disconnect();
-      } catch (e) {}
+      } catch (e) { }
       audioSourceRef.current = null;
     }
     if (!isAudioPausedRef.current) {
@@ -548,8 +547,8 @@ export default function VideoPlayerView({ videoData }) {
               Restart
             </Button>
 
-            {/* [TEMPORARILY HIDDEN] Talk to Teacher button - uncomment when ready */}
-            {/* <Button
+
+            <Button
               onClick={() => setShowVoiceTeacher(true)}
               variant="secondary"
               size="lg"
@@ -557,10 +556,10 @@ export default function VideoPlayerView({ videoData }) {
             >
               <Mic className="w-5 h-5 mr-2" />
               🎤 Talk to Teacher
-            </Button> */}
+            </Button>
 
-            {/* [TEMPORARILY HIDDEN] Ask Questions button - uncomment when ready */}
-            {/* <Button
+
+            <Button
               onClick={() => {
                 setShowChatbot(true);
                 setChatbotMinimized(false);
@@ -571,7 +570,7 @@ export default function VideoPlayerView({ videoData }) {
             >
               <MessageCircle className="w-5 h-5 mr-2" />
               💬 Ask Questions
-            </Button> */}
+            </Button>
 
             {videoEnded && (
               <Button
