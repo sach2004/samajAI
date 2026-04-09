@@ -1,9 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { LANGUAGE_NAMES } from "../../../lib/constants";
 import { prisma } from "../../../lib/prisma";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import { generateText } from "../../../lib/ai";
 
 export async function POST(request) {
   const startTime = Date.now();
@@ -57,16 +55,6 @@ export async function POST(request) {
 
     console.log(`🔄 Processing ${chunks.length} chunks...`);
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      },
-    });
-
     let contextualizedTranscript = [];
 
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
@@ -106,9 +94,7 @@ CRITICAL: Your response must start with [ and end with ]. Include nothing else -
 
       while (retries > 0 && !success) {
         try {
-          const result = await model.generateContent(prompt);
-          const response = await result.response;
-          const responseText = response.text();
+          const responseText = await generateText(prompt, { temperature: 0.7, topK: 40, topP: 0.95, maxOutputTokens: 8192 });
 
           console.log(`📦 Response length: ${responseText.length} chars`);
 

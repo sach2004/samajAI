@@ -1,8 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { LANGUAGE_NAMES } from "../../../lib/constants";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import { generateText } from "../../../lib/ai";
 
 export async function POST(request) {
   try {
@@ -52,19 +50,7 @@ CRITICAL: Start your response with [ and end with ]. No other text.`;
 
     console.log("🧠 Generating quiz questions in", languageName);
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.8,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 4096,
-      },
-    });
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const responseText = response.text();
+    const responseText = await generateText(prompt, { temperature: 0.8, topP: 0.95, maxOutputTokens: 8192 });
 
     let quizQuestions;
     try {

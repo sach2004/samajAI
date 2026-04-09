@@ -451,11 +451,11 @@ export default function VideoPlayerView({ videoData }) {
         </Alert>
       )}
 
-      <Card className="p-6 mb-6 bg-gradient-to-r from-orange-50 to-green-50">
+      <Card className="flex items-center justify-center p-6 mb-6 bg-gradient-to-r from-orange-50 to-green-50">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Video Ready with Natural Indian Voice! 🎉
+              Video Ready with Natural Indian Voice!
             </h3>
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">
@@ -482,7 +482,7 @@ export default function VideoPlayerView({ videoData }) {
             </div>
           </div>
 
-          <div className="flex gap-4 text-sm">
+          {/* <div className="flex gap-4 text-sm">
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">
                 {videoData.changes.currencyConversions}
@@ -501,7 +501,7 @@ export default function VideoPlayerView({ videoData }) {
               </div>
               <div className="text-gray-600">Measurements</div>
             </div>
-          </div>
+          </div> */}
         </div>
       </Card>
 
@@ -555,7 +555,7 @@ export default function VideoPlayerView({ videoData }) {
               className="bg-gradient-to-r from-purple-600 to-purple-500 text-white hover:from-purple-700 hover:to-purple-600"
             >
               <Mic className="w-5 h-5 mr-2" />
-              🎤 Talk to Teacher
+              Talk to Teacher
             </Button>
 
 
@@ -569,7 +569,7 @@ export default function VideoPlayerView({ videoData }) {
               className="bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600"
             >
               <MessageCircle className="w-5 h-5 mr-2" />
-              💬 Ask Questions
+              Ask Questions
             </Button>
 
             {videoEnded && (

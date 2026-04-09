@@ -25,51 +25,13 @@ export default function VoiceTeacher({ videoData, onClose }) {
   const [conversation, setConversation] = useState([]);
   const [error, setError] = useState("");
 
-  const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
   const audioContextRef = useRef(null);
   const audioSourceRef = useRef(null);
+  const pendingResponseRef = useRef(false);
 
   useEffect(() => {
-    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-      const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = getLanguageCode(videoData.language);
-
-      recognitionRef.current.onresult = (event) => {
-        let interimTranscript = "";
-        let finalTranscript = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + " ";
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-
-        if (finalTranscript) {
-          setTranscript(finalTranscript);
-          handleUserSpeech(finalTranscript.trim());
-        } else {
-          setTranscript(interimTranscript);
-        }
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
-        setError("Could not understand. Please speak clearly.");
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
-    }
-
     try {
       audioContextRef.current = new (window.AudioContext ||
         window.webkitAudioContext)();
@@ -83,26 +45,10 @@ export default function VoiceTeacher({ videoData, onClose }) {
     ]);
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      stopRecording();
       stopAudio();
     };
   }, []);
-
-  const getLanguageCode = (lang) => {
-    const codes = {
-      hi: "hi-IN",
-      ta: "ta-IN",
-      te: "te-IN",
-      bn: "bn-IN",
-      mr: "mr-IN",
-      kn: "kn-IN",
-      ml: "ml-IN",
-      gu: "gu-IN",
-    };
-    return codes[lang] || "hi-IN";
-  };
 
   const getWelcomeMessage = (lang) => {
     const messages = {
@@ -118,28 +64,130 @@ export default function VoiceTeacher({ videoData, onClose }) {
     return messages[lang] || messages.hi;
   };
 
-  const addMessage = (role, content, audioBase64 = null) => {
-    setConversation((prev) => [
-      ...prev,
-      { role, content, audioBase64, timestamp: Date.now() },
-    ]);
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    audioChunksRef.current = [];
   };
 
-  const toggleListening = () => {
+  const stopAudio = () => {
+    if (audioSourceRef.current) {
+      try {
+        audioSourceRef.current.onended = null;
+        audioSourceRef.current.stop();
+        audioSourceRef.current.disconnect();
+      } catch (e) {}
+      audioSourceRef.current = null;
+    }
+    setIsSpeaking(false);
+  };
+
+  const toggleListening = async () => {
     if (isListening) {
-      recognitionRef.current?.stop();
+      stopRecording();
       setIsListening(false);
-    } else {
-      setError("");
-      setTranscript("");
-      recognitionRef.current?.start();
+      return;
+    }
+
+    stopAudio();
+    setError("");
+    setTranscript("");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4",
+      });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (audioChunksRef.current.length === 0) {
+          setError("No audio recorded. Please try again.");
+          setIsListening(false);
+          return;
+        }
+
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType,
+        });
+
+        setIsListening(false);
+        await transcribeAudio(audioBlob);
+      };
+
+      mediaRecorder.onerror = (event) => {
+        console.error("MediaRecorder error:", event.error);
+        stream.getTracks().forEach((track) => track.stop());
+        setError("Recording failed. Please try again.");
+        setIsListening(false);
+      };
+
+      mediaRecorder.start();
       setIsListening(true);
+    } catch (err) {
+      console.error("Microphone error:", err);
+      if (err.name === "NotAllowedError") {
+        setError("Microphone access denied. Please allow mic permissions.");
+      } else {
+        setError("Could not access microphone. Please check your device.");
+      }
+    }
+  };
+
+  const transcribeAudio = async (audioBlob) => {
+    setIsProcessing(true);
+    setTranscript("Transcribing...");
+
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Transcription failed");
+      }
+
+      const data = await response.json();
+      const transcribedText = data.text?.trim();
+
+      if (!transcribedText) {
+        setError("Could not understand audio. Please speak again.");
+        return;
+      }
+
+      setTranscript(transcribedText);
+      await handleUserSpeech(transcribedText);
+    } catch (err) {
+      console.error("Transcription error:", err);
+      setError(`Transcription failed: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+      setTranscript("");
     }
   };
 
   const handleUserSpeech = async (text) => {
-    setIsListening(false);
-    addMessage("student", text);
+    if (pendingResponseRef.current) return;
+    pendingResponseRef.current = true;
+
+    const studentMsg = { role: "student", content: text, timestamp: Date.now() };
+    setConversation((prev) => [...prev, studentMsg]);
     setIsProcessing(true);
     setError("");
 
@@ -151,10 +199,10 @@ export default function VoiceTeacher({ videoData, onClose }) {
           question: text,
           language: videoData.language,
           videoContext: {
-            transcript: videoData.contextualizedTranscript,
-            changes: videoData.changes,
+            transcript: videoData.contextualizedTranscript || [],
+            changes: videoData.changes || {},
           },
-          conversationHistory: conversation.slice(-6),
+          conversationHistory: [...conversation, studentMsg].slice(-6),
         }),
       });
 
@@ -162,17 +210,18 @@ export default function VoiceTeacher({ videoData, onClose }) {
 
       const data = await response.json();
 
-      addMessage("teacher", data.answer, data.audioBase64);
+      const teacherMsg = { role: "teacher", content: data.answer, audioBase64: data.audioBase64, timestamp: Date.now() };
+      setConversation((prev) => [...prev, teacherMsg]);
 
       if (data.audioBase64) {
-        await playAudio(data.audioBase64);
+        playAudio(data.audioBase64);
       }
     } catch (err) {
       console.error("Error:", err);
       setError("Sorry, I could not process your question. Please try again.");
     } finally {
       setIsProcessing(false);
-      setTranscript("");
+      pendingResponseRef.current = false;
     }
   };
 
@@ -196,35 +245,23 @@ export default function VoiceTeacher({ videoData, onClose }) {
       const source = audioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContextRef.current.destination);
-
-      audioSourceRef.current = source;
-      source.start(0);
-
       source.onended = () => {
         setIsSpeaking(false);
         audioSourceRef.current = null;
       };
+
+      audioSourceRef.current = source;
+      source.start(0);
     } catch (error) {
       console.error("Audio playback error:", error);
-      setIsSpeaking(false);
+      stopAudio();
     }
-  };
-
-  const stopAudio = () => {
-    if (audioSourceRef.current) {
-      try {
-        audioSourceRef.current.stop();
-        audioSourceRef.current.disconnect();
-      } catch (e) {}
-      audioSourceRef.current = null;
-    }
-    setIsSpeaking(false);
   };
 
   const replayMessage = (message) => {
-    if (message.audioBase64) {
-      playAudio(message.audioBase64);
-    }
+    if (!message.audioBase64) return;
+    stopAudio();
+    playAudio(message.audioBase64);
   };
 
   return (
@@ -289,7 +326,7 @@ export default function VoiceTeacher({ videoData, onClose }) {
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm font-bold">
-                    Teacher is thinking...
+                    {transcript ? "Transcribing..." : "Teacher is thinking..."}
                   </span>
                 </div>
               </div>
@@ -301,7 +338,7 @@ export default function VoiceTeacher({ videoData, onClose }) {
           {transcript && (
             <div className="mb-4 p-3 bg-white rounded-lg border-2 border-black">
               <p className="text-sm font-bold text-gray-700">
-                🎤 Listening: {transcript}
+                🎤 {transcript}
               </p>
             </div>
           )}
@@ -323,7 +360,7 @@ export default function VoiceTeacher({ videoData, onClose }) {
               {isListening ? (
                 <>
                   <MicOff className="w-5 h-5" />
-                  Stop Listening
+                  Stop Recording
                 </>
               ) : (
                 <>

@@ -1,8 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { LANGUAGE_NAMES } from "../../../lib/constants";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+import { generateText } from "../../../lib/ai";
 
 export async function POST(request) {
   try {
@@ -25,13 +23,7 @@ ${text}
 
 Return ONLY the translated text in ${languageName}.`;
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
-    });
-
-    const result = await model.generateContent(prompt);
-    const contextualizedText = result.response.text();
+    const contextualizedText = await generateText(prompt, { temperature: 0.7, maxOutputTokens: 8192 });
 
     console.log("✅ Contextualized:", contextualizedText.length, "chars");
 

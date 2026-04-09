@@ -1,8 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { LANGUAGE_NAMES } from "../../../lib/constants";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import { generateText } from "../../../lib/ai";
 
 const LANGUAGE_CODES = {
   hi: "hi-IN",
@@ -47,7 +45,7 @@ export async function POST(request) {
       });
     }
 
-    const videoSummary = videoContext.transcript
+    const videoSummary = (videoContext?.transcript || [])
       .slice(0, 20)
       .map((seg) => seg.text)
       .join(" ")
@@ -73,20 +71,9 @@ TEACHING GUIDELINES:
 
 IMPORTANT: Respond ONLY in ${languageName}. Keep it short for voice output (max 150 words).`;
 
-    console.log("🤖 Calling Gemini for teacher response...");
+    console.log("🤖 Generating teacher response...");
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: {
-        temperature: 0.8,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 500,
-      },
-    });
-
-    const result = await model.generateContent(prompt);
-    const answer = result.response.text().trim();
+    const answer = (await generateText(prompt, { temperature: 0.8, topP: 0.95, maxOutputTokens: 500 })).trim();
 
     console.log(
       `✅ Generated answer in ${languageName}:`,
