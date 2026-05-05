@@ -77,7 +77,7 @@ export default function VoiceTeacher({ videoData, onClose }) {
         audioSourceRef.current.onended = null;
         audioSourceRef.current.stop();
         audioSourceRef.current.disconnect();
-      } catch (e) {}
+      } catch (e) { }
       audioSourceRef.current = null;
     }
     setIsSpeaking(false);
@@ -152,6 +152,7 @@ export default function VoiceTeacher({ videoData, onClose }) {
     try {
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
+      formData.append("language", videoData.language)
 
       const response = await fetch("/api/transcribe", {
         method: "POST",
@@ -285,16 +286,14 @@ export default function VoiceTeacher({ videoData, onClose }) {
           {conversation.map((msg, idx) => (
             <div
               key={idx}
-              className={`flex gap-3 ${
-                msg.role === "student" ? "justify-end" : "justify-start"
-              }`}
+              className={`flex gap-3 ${msg.role === "student" ? "justify-end" : "justify-start"
+                }`}
             >
               <div
-                className={`max-w-[80%] rounded-2xl p-4 ${
-                  msg.role === "student"
-                    ? "bg-[#f582ae] text-white border-3 border-black shadow-cartoon-sm"
-                    : "bg-white border-3 border-black shadow-cartoon-sm"
-                }`}
+                className={`max-w-[80%] rounded-2xl p-4 ${msg.role === "student"
+                  ? "bg-[#f582ae] text-white border-3 border-black shadow-cartoon-sm"
+                  : "bg-white border-3 border-black shadow-cartoon-sm"
+                  }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <Badge
